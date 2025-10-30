@@ -1,12 +1,27 @@
 {
   "name": "aframe-test",
-  "version": "0.1.0",
-  "private": true,
-  "description": "Minimal A-Frame test project",
+  "version": "1.0.0",
+  "description": "A-Frame VR project with Vite",
+  "type": "module",
   "scripts": {
-    "dev": "python3 -m http.server 5173",
-    "start": "npm run dev"
-  }
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "aframe": "1.7.0"
+  },
+  "devDependencies": {
+    "vite": "^5.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vivianzmyff/AFrame-Test.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/vivianzmyff/AFrame-Test/issues"
+  },
+  "homepage": "https://github.com/vivianzmyff/AFrame-Test#readme"
 }
-
-

@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>A-Frame Test</title>
+    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+    <style>
+      html, body { margin: 0; height: 100%; }
+    </style>
+  </head>
+  <body>
+    <a-scene>
+      <a-camera position="0 2.2 -2.5" look-controls="enabled: true"></a-camera>
+      <a-entity position="0 0 -2.5" rotation="0 180 0" scale="0.02 0.02 0.02">
+        <a-entity gltf-model="url(public/elsie_stackable_dining_chair_white.glb)"></a-entity>
+      </a-entity>      <a-entity gltf-model="url(public/long_table_and_chairs_low_poly.glb)" position="0 0 -4" rotation="0 180 0" scale="2 2 2"></a-entity>
+      <a-plane 
+      position="0 0 -4" 
+      rotation="-90 0 0" 
+      width="4" 
+      height="4" 
+      scale="2 2 1" 
+      color="#7BC8A4">
+    </a-plane>
+          <a-sky color="#ECECEC"></a-sky>
+    </a-scene>
+  </body>
+  </html>
+
+

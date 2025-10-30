@@ -1,0 +1,12 @@
+{
+  "name": "aframe-test",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Minimal A-Frame test project",
+  "scripts": {
+    "dev": "python3 -m http.server 5173",
+    "start": "npm run dev"
+  }
+}
+
+

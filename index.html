@@ -7,15 +7,32 @@
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
     <style>
       html, body { margin: 0; height: 100%; }
+      #hud {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        color: #36d67e;
+        font-size: 32px;
+        font-weight: bold;
+        font-family: Arial, sans-serif;
+        pointer-events: none;
+        z-index: 9999;
+      }
     </style>
   </head>
   <body>
+    <div id="hud">$1000</div>
     <a-scene>
       <a-camera position="0 2.2 -2.5" look-controls="enabled: true"></a-camera>
       <a-entity position="0 0 -2.5" rotation="0 180 0" scale="0.02 0.02 0.02">
         <a-entity gltf-model="url(public/elsie_stackable_dining_chair_white.glb)"></a-entity>
       </a-entity>      <a-entity gltf-model="url(public/long_table_and_chairs_low_poly.glb)" position="0 0 -4" rotation="0 180 0" scale="2 2 2"></a-entity>
-      <a-plane 
+      <a-box 
+      position="0.7 1.5 -4.9" 
+      color="#FF0000" 
+      scale="0.9 0.9 0.9">
+    </a-box>
+          <a-plane 
       position="0 0 -4" 
       rotation="-90 0 0" 
       width="4" 

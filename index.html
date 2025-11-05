@@ -24,10 +24,16 @@
     <div id="hud">$1000</div>
     <a-scene>
       <a-camera position="0 2.2 -2.5" look-controls="enabled: true"></a-camera>
-      <a-entity gltf-model="url(public/free_empty_room.glb)" position="0 0 -4"></a-entity>
-      <a-entity position="0 0 -2.5" rotation="0 180 0" scale="0.02 0.02 0.02">
+      <a-entity gltf-model="url(public/ceiling_fluorescent_light.glb)" 
+      position="0 10 -2.5" 
+      scale="0.05 0.05 0.05" 
+      rotation="0 90 0">
+</a-entity>
+  <a-entity gltf-model="url(public/free_empty_room.glb)" position="0 0 -4"></a-entity>
+      <a-entity position="0 0 -2.5" rotation="0 180 0" scale="0.01 0.01 0.01">
         <a-entity gltf-model="url(public/elsie_stackable_dining_chair_white.glb)"></a-entity>
-      </a-entity>      <a-entity gltf-model="url(public/long_table_and_chairs_low_poly.glb)" position="0 0 -4" rotation="0 180 0" scale="2 2 2"></a-entity>
+      </a-entity>
+      <a-entity gltf-model="url(public/long_table_and_chairs_low_poly.glb)" position="0 0 -4" rotation="0 180 0" scale="2 2 2"></a-entity>
       <a-plane position="-1 2.4 -4" rotation="0 0 0" width="1.2" height="2" color="#cccccc"></a-plane>
       <a-box 
       position="0.7 1.5 -4.9" 

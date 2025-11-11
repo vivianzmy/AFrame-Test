@@ -6,7 +6,58 @@
     <title>A-Frame Test</title>
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
     <script>
-      // Custom component to make menu always face camera
+      // ============================================
+      // MONEY MANAGEMENT SYSTEM
+      // ============================================
+      let money = 1000;
+      const itemCost = 100;
+
+      // Update money display
+      function updateMoneyDisplay() {
+        const moneyText = document.querySelector('#money-text');
+        if (moneyText) {
+          moneyText.setAttribute('value', `$${money}`);
+        }
+        // Also update HTML HUD
+        const hud = document.querySelector('#hud');
+        if (hud) {
+          hud.textContent = `$${money}`;
+        }
+      }
+
+      // Purchase function
+      function purchase(cost, itemName) {
+        if (money >= cost) {
+          money -= cost;
+          updateMoneyDisplay();
+          console.log(`Purchased: ${itemName} for $${cost}. Remaining: $${money}`);
+          
+          // Optional: Add visual feedback
+          const moneyText = document.querySelector('#money-text');
+          if (moneyText) {
+            moneyText.setAttribute('animation', 'property: color; from: #ff0000; to: #565656; dur: 500');
+            setTimeout(() => {
+              moneyText.removeAttribute('animation');
+            }, 500);
+          }
+          return true;
+        } else {
+          console.log(`Insufficient funds! Need $${cost}, have $${money}`);
+          // Optional: Add visual feedback for insufficient funds
+          const moneyText = document.querySelector('#money-text');
+          if (moneyText) {
+            moneyText.setAttribute('animation', 'property: scale; from: 1.2 1.2 1.2; to: 1 1 1; dur: 300');
+            setTimeout(() => {
+              moneyText.removeAttribute('animation');
+            }, 300);
+          }
+          return false;
+        }
+      }
+
+      // ============================================
+      // FACE CAMERA COMPONENT
+      // ============================================
       AFRAME.registerComponent('face-camera', {
         tick: function() {
           const camera = document.querySelector('#camera');
@@ -14,21 +65,65 @@
             const cameraPos = camera.getAttribute('position');
             const menuPos = this.el.getAttribute('position');
             
-            // Calculate direction from menu to camera
             const dx = cameraPos.x - menuPos.x;
             const dy = cameraPos.y - menuPos.y;
             const dz = cameraPos.z - menuPos.z;
             
-            // Calculate horizontal rotation (Y axis)
             const yAngle = Math.atan2(dx, dz) * (180 / Math.PI);
-            
-            // Calculate vertical rotation (X axis) - for full 3D facing
             const distance = Math.sqrt(dx * dx + dz * dz);
             const xAngle = -Math.atan2(dy, distance) * (180 / Math.PI);
             
             this.el.setAttribute('rotation', `${xAngle} ${yAngle} 0`);
           }
         }
+      });
+
+      // ============================================
+      // HOVER FEEDBACK COMPONENT
+      // ============================================
+      AFRAME.registerComponent('hover-feedback', {
+        init: function() {
+          this.el.addEventListener('mouseenter', () => {
+            this.el.setAttribute('material', 'opacity', '0.3');
+          });
+          this.el.addEventListener('mouseleave', () => {
+            this.el.setAttribute('material', 'opacity', '0');
+          });
+          // For VR cursor
+          this.el.addEventListener('raycaster-intersected', () => {
+            this.el.setAttribute('material', 'opacity', '0.3');
+          });
+          this.el.addEventListener('raycaster-intersected-cleared', () => {
+            this.el.setAttribute('material', 'opacity', '0');
+          });
+        }
+      });
+
+      // ============================================
+      // CLICKABLE MENU ITEM COMPONENT
+      // ============================================
+      AFRAME.registerComponent('menu-item', {
+        schema: {
+          cost: { type: 'number', default: 100 },
+          itemName: { type: 'string', default: 'Item' }
+        },
+        init: function() {
+          this.handleClick = () => {
+            purchase(this.data.cost, this.data.itemName);
+          };
+          this.el.addEventListener('click', this.handleClick);
+        },
+        remove: function() {
+          this.el.removeEventListener('click', this.handleClick);
+        }
+      });
+
+      // Initialize money display when scene loads
+      document.addEventListener('DOMContentLoaded', () => {
+        const scene = document.querySelector('a-scene');
+        scene.addEventListener('loaded', () => {
+          updateMoneyDisplay();
+        });
       });
     </script>
     <style>
@@ -49,7 +144,18 @@
   <body>
     <div id="hud">$1000</div>
     <a-scene>
-      <a-camera id="camera" position="0 2.2 -2.5" look-controls="enabled: true"></a-camera>
+      <!-- Camera with cursor for VR interaction -->
+      <a-camera id="camera" position="0 2.2 -2.5" look-controls="enabled: true">
+        <a-cursor 
+          id="cursor"
+          raycaster="objects: .clickable"
+          geometry="primitive: ring; radiusInner: 0.02; radiusOuter: 0.03"
+          material="color: #4CC3D9; shader: flat"
+          animation__click="property: scale; startEvents: click; from: 0.8 0.8 0.8; to: 1 1 1; dur: 150"
+          animation__fusing="property: scale; startEvents: fusing; from: 1 1 1; to: 0.8 0.8 0.8; dur: 1500"
+          animation__mouseleave="property: scale; startEvents: mouseleave; from: 1.2 1.2 1.2; to: 1 1 1; dur: 150">
+        </a-cursor>
+      </a-camera>
       <a-entity gltf-model="url(/potted_plant_mediterranean_med_leaf_low_poly.glb)" position="-4 0 -8.5"  scale="2 2 2"></a-entity>
       <a-entity gltf-model="url(/potted_plant_wk_8.glb)" position="4 0.7 -8.3" scale="0.02 0.02 0.02"></a-entity>
       <a-entity gltf-model="url(/ceiling_fluorescent_light.glb)"
@@ -77,7 +183,111 @@
         <a-entity gltf-model="url(/elsie_stackable_dining_chair_white.glb)" scale="2 2 2"></a-entity>
       </a-entity>
       <a-entity gltf-model="url(/long_table_and_chairs_low_poly.glb)" position="0 0 -4" rotation="0 180 0" scale="2 2 2"></a-entity>
-      <a-plane position="-1 2.4 -4" width="1.2" height="2" src="/MENU.png" material="transparent: true; alphaTest: 0.1" face-camera></a-plane>
+      <!-- ============================================ -->
+      <!-- MENU SYSTEM -->
+      <!-- ============================================ -->
+      <!-- 
+        MENU SETUP INSTRUCTIONS:
+        - Menu is positioned at (-1, 1.5, -3) with width="2" and height="2.5"
+        - Menu background is centered at (0, 0, 0) relative to container
+        - Menu items are positioned relative to the container center
+        - Y coordinate: positive = higher on menu, negative = lower on menu
+        - To adjust item positions:
+          1. Open your scene and hover over menu items (they show semi-transparent on hover)
+          2. Adjust the Y value in the position attribute to match your PNG layout
+          3. Adjust width/height if needed to cover the clickable area
+        - Z coordinate (0.01) puts clickable planes slightly in front of background
+        - All items cost $100 by default (change in menu-item="cost: 100")
+      -->
+      <!-- Menu container that faces camera -->
+      <a-entity id="menu-container" position="-1 1.5 -3" face-camera>
+        
+        <!-- Static menu background image -->
+        <a-image 
+          id="menu-background"
+          src="/MENU.png"
+          width="2"
+          height="2.5"
+          position="0 0 0"
+          material="transparent: true; alphaTest: 0.1">
+        </a-image>
+
+        <!-- Menu Item 1: New Language -->
+        <!-- Position: Adjust Y value to match where "New Language" appears on your PNG -->
+        <!-- Typical menu layout: items spaced ~0.35 units vertically -->
+        <!-- Y=0.8 is near the top of a 2.5-unit-tall menu -->
+        <a-plane 
+          class="clickable menu-item"
+          menu-item="cost: 100; itemName: New Language"
+          position="0 0.8 0.01"
+          width="1.6"
+          height="0.25"
+          material="color: #ffffff; transparent: true; opacity: 0; side: double"
+          hover-feedback>
+        </a-plane>
+
+        <!-- Menu Item 2: Coding Literacy -->
+        <a-plane 
+          class="clickable menu-item"
+          menu-item="cost: 100; itemName: Coding Literacy"
+          position="0 0.45 0.01"
+          width="1.6"
+          height="0.25"
+          material="color: #ffffff; transparent: true; opacity: 0; side: double"
+          hover-feedback>
+        </a-plane>
+
+        <!-- Menu Item 3: Musical Ability -->
+        <a-plane 
+          class="clickable menu-item"
+          menu-item="cost: 100; itemName: Musical Ability"
+          position="0 0.1 0.01"
+          width="1.6"
+          height="0.25"
+          material="color: #ffffff; transparent: true; opacity: 0; side: double"
+          hover-feedback>
+        </a-plane>
+
+        <!-- Menu Item 4: (Add more items as needed) -->
+        <!-- Uncomment and adjust position for additional menu items -->
+        <!--
+        <a-plane 
+          class="clickable menu-item"
+          menu-item="cost: 100; itemName: Item Name"
+          position="0 -0.25 0.01"
+          width="1.6"
+          height="0.25"
+          material="color: #ffffff; transparent: true; opacity: 0; side: double"
+          hover-feedback>
+        </a-plane>
+        -->
+
+        <!-- Menu Item 5: (Add more items as needed) -->
+        <!--
+        <a-plane 
+          class="clickable menu-item"
+          menu-item="cost: 100; itemName: Item Name"
+          position="0 -0.6 0.01"
+          width="1.6"
+          height="0.25"
+          material="color: #ffffff; transparent: true; opacity: 0; side: double"
+          hover-feedback>
+        </a-plane>
+        -->
+
+      </a-entity>
+
+      <!-- Money counter in 3D space (optional, if you want it in the scene) -->
+      <a-text 
+  id="money-text"
+  value="$1000"
+  position="2 2.5 -2.5"
+  align="left"
+  color="#FF0000"
+  scale="2 2 2"
+  look-at="#camera"
+  visible="false">
+</a-text>
       <a-box 
               position="0.7 1.5 -4.9" 
               color="#FF0000" 

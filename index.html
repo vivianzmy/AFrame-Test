@@ -200,7 +200,7 @@
         - All items cost $100 by default (change in menu-item="cost: 100")
       -->
       <!-- Menu container that faces camera -->
-      <a-entity id="menu-container" position="-1 1.5 -3" face-camera>
+      <a-entity id="menu-container" position="-2 2.5 -4.2" face-camera>
         
         <!-- Static menu background image -->
         <a-image 
@@ -279,15 +279,14 @@
 
       <!-- Money counter in 3D space (optional, if you want it in the scene) -->
       <a-text 
-  id="money-text"
-  value="$1000"
-  position="2 2.5 -2.5"
-  align="left"
-  color="#FF0000"
-  scale="2 2 2"
-  look-at="#camera"
-  visible="false">
-</a-text>
+        id="money-text"
+        value="$1000"
+        position="2 2.5 -2.5"
+        align="left"
+        color="#565656"
+        scale="2 2 2"
+        look-at="#camera">
+      </a-text>
       <a-box 
               position="0.7 1.5 -4.9" 
               color="#FF0000" 

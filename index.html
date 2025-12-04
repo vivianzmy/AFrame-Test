@@ -7,10 +7,90 @@
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
     <script>
       // ============================================
+      // FACE CAMERA COMPONENT
+      // ============================================
+      AFRAME.registerComponent('face-camera', {
+        tick: function() {
+          const camera = document.querySelector('#camera');
+          if (camera) {
+            const cameraPos = camera.getAttribute('position');
+            const elPos = this.el.getAttribute('position');
+            
+            const dx = cameraPos.x - elPos.x;
+            const dy = cameraPos.y - elPos.y;
+            const dz = cameraPos.z - elPos.z;
+            
+            const yAngle = Math.atan2(dx, dz) * (180 / Math.PI);
+            const distance = Math.sqrt(dx * dx + dz * dz);
+            const xAngle = -Math.atan2(dy, distance) * (180 / Math.PI);
+            
+            this.el.setAttribute('rotation', `${xAngle} ${yAngle} 0`);
+          }
+        }
+      });
+
+      // ============================================
+      // PNG TRANSPARENCY FIX COMPONENT
+      // ============================================
+      AFRAME.registerComponent('fix-png-transparency', {
+        init: function() {
+          this.applyFix = this.applyFix.bind(this);
+          
+          // Try to apply fix immediately
+          this.applyFix();
+          
+          // Also try after model loads
+          this.el.addEventListener('loaded', this.applyFix);
+          this.el.addEventListener('model-loaded', this.applyFix);
+          
+          // Use tick to check when texture becomes available
+          this.textureFixed = false;
+        },
+        
+        tick: function() {
+          if (!this.textureFixed) {
+            this.applyFix();
+          }
+        },
+        
+        applyFix: function() {
+          const mesh = this.el.getObject3D('mesh');
+          if (!mesh) return;
+          
+          const material = mesh.material;
+          if (!material) return;
+          
+          const texture = material.map;
+          if (!texture) return;
+          
+          // Fix texture settings
+          texture.generateMipmaps = false;
+          texture.minFilter = THREE.LinearFilter;
+          texture.magFilter = THREE.LinearFilter;
+          texture.premultiplyAlpha = true;
+          texture.needsUpdate = true;
+          
+          // Fix material settings
+          material.transparent = true;
+          material.premultipliedAlpha = true;
+          material.alphaTest = 0.1;
+          material.side = THREE.DoubleSide;
+          material.needsUpdate = true;
+          
+          this.textureFixed = true;
+        },
+        
+        remove: function() {
+          this.el.removeEventListener('loaded', this.applyFix);
+          this.el.removeEventListener('model-loaded', this.applyFix);
+        }
+      });
+
+      // ============================================
       // MONEY MANAGEMENT SYSTEM
       // ============================================
       let money = 1000;
-      const itemCost = 100;
+      const ITEM_COST = 100;
 
       // Update money display
       function updateMoneyDisplay() {
@@ -25,104 +105,161 @@
         }
       }
 
-      // Purchase function
-      function purchase(cost, itemName) {
+      // Deduct cost from money (prevents going negative)
+      function deductCost(cost) {
         if (money >= cost) {
           money -= cost;
           updateMoneyDisplay();
-          console.log(`Purchased: ${itemName} for $${cost}. Remaining: $${money}`);
-          
-          // Optional: Add visual feedback
-          const moneyText = document.querySelector('#money-text');
-          if (moneyText) {
-            moneyText.setAttribute('animation', 'property: color; from: #ff0000; to: #565656; dur: 500');
-            setTimeout(() => {
-              moneyText.removeAttribute('animation');
-            }, 500);
-          }
           return true;
-        } else {
-          console.log(`Insufficient funds! Need $${cost}, have $${money}`);
-          // Optional: Add visual feedback for insufficient funds
-          const moneyText = document.querySelector('#money-text');
-          if (moneyText) {
-            moneyText.setAttribute('animation', 'property: scale; from: 1.2 1.2 1.2; to: 1 1 1; dur: 300');
-            setTimeout(() => {
-              moneyText.removeAttribute('animation');
-            }, 300);
-          }
-          return false;
         }
+        return false;
       }
 
       // ============================================
-      // FACE CAMERA COMPONENT
+      // TOAST NOTIFICATION SYSTEM
       // ============================================
-      AFRAME.registerComponent('face-camera', {
-        tick: function() {
-          const camera = document.querySelector('#camera');
-          if (camera) {
-            const cameraPos = camera.getAttribute('position');
-            const menuPos = this.el.getAttribute('position');
-            
-            const dx = cameraPos.x - menuPos.x;
-            const dy = cameraPos.y - menuPos.y;
-            const dz = cameraPos.z - menuPos.z;
-            
-            const yAngle = Math.atan2(dx, dz) * (180 / Math.PI);
-            const distance = Math.sqrt(dx * dx + dz * dz);
-            const xAngle = -Math.atan2(dy, distance) * (180 / Math.PI);
-            
-            this.el.setAttribute('rotation', `${xAngle} ${yAngle} 0`);
-          }
+      function showToast(itemName) {
+        // Get camera
+        const camera = document.querySelector('#camera');
+        if (!camera) {
+          console.error('Camera not found!');
+          return;
         }
-      });
+
+        // Remove existing toast if any
+        const existingToast = document.querySelector('#toast-notification');
+        if (existingToast) {
+          existingToast.parentNode.removeChild(existingToast);
+        }
+
+        // Create toast element - attached to camera as HUD
+        const toast = document.createElement('a-text');
+        toast.setAttribute('id', 'toast-notification');
+        toast.setAttribute('value', `+ ${itemName}`);
+        // Camera-local coordinates for bottom-left corner
+        toast.setAttribute('position', '-0.8 -0.5 -1');
+        toast.setAttribute('align', 'left');
+        toast.setAttribute('color', '#565656');
+        toast.setAttribute('scale', '1.5 1.5 1.5');
+        toast.setAttribute('opacity', '0');
+        
+        // Attach to camera (not scene) - this makes it behave like a HUD
+        camera.appendChild(toast);
+
+        // Fade in animation
+        toast.setAttribute('animation__fadein', 'property: opacity; from: 0; to: 1; dur: 200');
+        
+        // After 1 second, fade out and remove
+        setTimeout(() => {
+          toast.setAttribute('animation__fadeout', 'property: opacity; from: 1; to: 0; dur: 300');
+          setTimeout(() => {
+            if (toast.parentNode) {
+              toast.parentNode.removeChild(toast);
+            }
+          }, 300);
+        }, 1000);
+      }
 
       // ============================================
-      // HOVER FEEDBACK COMPONENT
+      // MENU CHOICE COMPONENT
       // ============================================
-      AFRAME.registerComponent('hover-feedback', {
+      // This component handles clicks on menu items
+      // It reads the itemName from the clicked entity's data attribute
+      // The click detection uses mouse-based raycaster, so it targets the actual entity under the mouse cursor
+      AFRAME.registerComponent('menu-choice', {
+        schema: {
+          itemName: { type: 'string', default: 'Item' },
+          cost: { type: 'number', default: 100 }
+        },
+        
         init: function() {
+          // Set starting opacity to 0 so colliders are invisible by default
+          this.el.setAttribute('material', 'opacity', 0);
+          
+          // Click handler: reads itemName from the actual clicked entity
+          // HOW CLICK TARGET TEXT IS RETRIEVED:
+          // 1. The mouse-based raycaster (rayOrigin: mouse) ensures clicks happen where the mouse cursor is
+          // 2. When a menu item is clicked, the event fires on that specific entity (this.el)
+          // 3. We read the itemName from this.el.components['menu-choice'].data.itemName
+          // 4. This guarantees we get the exact text from the entity that was actually intersected by the mouse raycast
+          this.handleClick = (evt) => {
+            // DEBUG: Log click event
+            console.log('CLICK', this.data.itemName, this.el.getAttribute('position'));
+            
+            // Get the clicked entity - this.el is the entity that was actually intersected by the mouse raycaster
+            // The mouse raycaster (rayOrigin: mouse) ensures this is the entity under the mouse cursor, not the center reticle
+            const clickedEntity = this.el;
+            
+            // Read itemName from the clicked entity's menu-choice component data
+            // This ensures we get the exact text from the entity that was clicked
+            const menuChoiceComponent = clickedEntity.components['menu-choice'];
+            if (!menuChoiceComponent) {
+              console.error('Menu choice component not found on clicked entity');
+              return;
+            }
+            
+            // Get the exact item name from the clicked entity's component data
+            const itemName = menuChoiceComponent.data.itemName;
+            const cost = menuChoiceComponent.data.cost;
+            
+            // Deduct cost
+            if (deductCost(cost)) {
+              // Show toast notification with the exact item name from the clicked entity
+              // The toast text is updated based on the clicked item's itemName property
+              showToast(itemName);
+              console.log(`Purchased: ${itemName} for $${cost}. Remaining: $${money}`);
+            } else {
+              console.log(`Insufficient funds! Need $${cost}, have $${money}`);
+            }
+          };
+          
+          // Attach click listener to this specific menu item entity
+          // The mouse raycaster will only trigger this if the mouse cursor is over this entity
+          this.el.addEventListener('click', this.handleClick);
+          
+          // Hover feedback: only change opacity on mouseenter/mouseleave
           this.el.addEventListener('mouseenter', () => {
-            this.el.setAttribute('material', 'opacity', '0.3');
+            this.el.setAttribute('material', 'opacity', 0.2);
           });
           this.el.addEventListener('mouseleave', () => {
-            this.el.setAttribute('material', 'opacity', '0');
+            this.el.setAttribute('material', 'opacity', 0);
           });
-          // For VR cursor
-          this.el.addEventListener('raycaster-intersected', () => {
-            this.el.setAttribute('material', 'opacity', '0.3');
-          });
-          this.el.addEventListener('raycaster-intersected-cleared', () => {
-            this.el.setAttribute('material', 'opacity', '0');
-          });
-        }
-      });
-
-      // ============================================
-      // CLICKABLE MENU ITEM COMPONENT
-      // ============================================
-      AFRAME.registerComponent('menu-item', {
-        schema: {
-          cost: { type: 'number', default: 100 },
-          itemName: { type: 'string', default: 'Item' }
         },
-        init: function() {
-          this.handleClick = () => {
-            purchase(this.data.cost, this.data.itemName);
-          };
-          this.el.addEventListener('click', this.handleClick);
-        },
+        
         remove: function() {
           this.el.removeEventListener('click', this.handleClick);
         }
       });
 
-      // Initialize money display when scene loads
+      // Initialize money display and raycaster intersection logging when scene loads
       document.addEventListener('DOMContentLoaded', () => {
         const scene = document.querySelector('a-scene');
         scene.addEventListener('loaded', () => {
           updateMoneyDisplay();
+          
+          // DEBUG: Listen to raycaster-intersection events to verify mouse-based raycasting
+          const mouseCursorEl = document.querySelector('#mouseCursor');
+          if (mouseCursorEl) {
+            mouseCursorEl.addEventListener('raycaster-intersection', (e) => {
+              const intersections = e.detail.intersections || [];
+              const itemNames = intersections
+                .map(i => {
+                  if (i.object && i.object.el) {
+                    const menuChoice = i.object.el.components['menu-choice'];
+                    return menuChoice ? menuChoice.data.itemName : null;
+                  }
+                  return null;
+                })
+                .filter(name => name !== null);
+              console.log('Intersections from mouse:', itemNames);
+            });
+            
+            mouseCursorEl.addEventListener('raycaster-intersection-cleared', () => {
+              console.log('Mouse raycaster cleared (no intersections)');
+            });
+          } else {
+            console.error('mouseCursor element not found!');
+          }
         });
       });
     </script>
@@ -144,19 +281,274 @@
   <body>
     <div id="hud">$1000</div>
     <a-scene>
-      <!-- Camera with cursor for VR interaction -->
-      <a-camera id="camera" position="0 2.2 -2.5" look-controls="enabled: true">
-        <a-cursor 
-          id="cursor"
-          raycaster="objects: .clickable"
-          geometry="primitive: ring; radiusInner: 0.02; radiusOuter: 0.03"
-          material="color: #4CC3D9; shader: flat"
-          animation__click="property: scale; startEvents: click; from: 0.8 0.8 0.8; to: 1 1 1; dur: 150"
-          animation__fusing="property: scale; startEvents: fusing; from: 1 1 1; to: 0.8 0.8 0.8; dur: 1500"
-          animation__mouseleave="property: scale; startEvents: mouseleave; from: 1.2 1.2 1.2; to: 1 1 1; dur: 150">
-        </a-cursor>
+      <!-- Camera with mouse-based raycaster for desktop interaction -->
+      <!-- 
+        MOUSE RAYCASTER SETUP:
+        - Dedicated mouseCursor entity inside camera owns cursor + raycaster components
+        - cursor="rayOrigin: mouse" makes clicks based on mouse position (not center reticle)
+        - raycaster="objects: .menu-item-clickable" only targets menu items
+        - No visual cursor ring - this is a desktop mouse experience
+        - Click events are triggered automatically by the mouse raycaster
+      -->
+      <a-camera 
+        id="camera" 
+        position="0 2.2 -2.5" 
+        look-controls="enabled: true">
+        <!-- Dedicated mouse cursor entity - invisible, handles mouse-based raycasting -->
+        <a-entity
+          id="mouseCursor"
+          cursor="rayOrigin: mouse; fuse: false"
+          raycaster="objects: .menu-item-clickable; far: 50">
+        </a-entity>
       </a-camera>
       <a-entity gltf-model="url(/potted_plant_mediterranean_med_leaf_low_poly.glb)" position="-4 0 -8.5"  scale="2 2 2"></a-entity>
+      <!-- Menu Image -->
+      <a-entity id="menu-container" position="0 4 -8.8">
+        <a-image 
+          src="/MENU-01.png"
+          position="0 0 0"
+          width="8"
+          height="5.18"
+          material="transparent: true; alphaTest: 0.1; shader: flat; side: double"
+          fix-png-transparency>
+        </a-image>
+
+        <!-- Clickable Menu Items -->
+        <!-- Menu is 8 units wide, 5.18 units tall -->
+        <!-- Items are positioned relative to menu center (0, 0, 0) -->
+        <!-- Each collider is narrow (width 2.4) and short (height 0.22) to match individual text lines -->
+        <!-- X positions: PERSONALITY (left) x=-2.4, TECHNICAL (center) x=0, SOCIAL (right) x=2.4 -->
+        <!-- Y positions: one row every -0.3 units, starting at 0.4 for the first item in each column -->
+        <!-- Z position: 0.05 (slightly in front of menu image at z=0) -->
+
+        <!-- PERSONALITY Section (left column, x = -2.4, 9 items) -->
+        <a-plane 
+          class="menu-item-clickable"
+          menu-choice="itemName: Confidence Boost; cost: 100"
+          position="-2.4 -0.38 0.05"
+          width="2.4"
+          height="0.22"
+          material="color: #00ff00; transparent: true; opacity: 0; side: double">
+        </a-plane>
+        
+        <a-plane 
+          class="menu-item-clickable"
+          menu-choice="itemName: Politeness Filter; cost: 100"
+          position="-2.4 -0.58 0.05"
+          width="2.4"
+          height="0.22"
+          material="color: #00ff00; transparent: true; opacity: 0; side: double">
+        </a-plane>
+        
+        <a-plane 
+          class="menu-item-clickable"
+          menu-choice="itemName: Small-Talk Expansion Pack; cost: 100"
+          position="-2.4 -0.78 0.05"
+          width="2.4"
+          height="0.22"
+          material="color: #00ff00; transparent: true; opacity: 0; side: double">
+        </a-plane>
+        
+        <a-plane 
+          class="menu-item-clickable"
+          menu-choice="itemName: Empathy Upgrade; cost: 100"
+          position="-2.4 -0.98 0.05"
+          width="2.4"
+          height="0.22"
+          material="color: #00ff00; transparent: true; opacity: 0; side: double">
+        </a-plane>
+        
+        <a-plane 
+          class="menu-item-clickable"
+          menu-choice="itemName: Agreeableness; cost: 100"
+          position="-2.4 -1.18 0.05"
+          width="2.4"
+          height="0.22"
+          material="color: #00ff00; transparent: true; opacity: 0; side: double">
+        </a-plane>
+        
+        <a-plane 
+          class="menu-item-clickable"
+          menu-choice="itemName: Charisma / Humor; cost: 100"
+          position="-2.4 -1.38 0.05"
+          width="2.4"
+          height="0.22"
+          material="color: #00ff00; transparent: true; opacity: 0; side: double">
+        </a-plane>
+        
+        <a-plane 
+          class="menu-item-clickable"
+          menu-choice="itemName: Leadership Aura; cost: 100"
+          position="-2.4 -1.58 0.05"
+          width="2.4"
+          height="0.22"
+          material="color: #00ff00; transparent: true; opacity: 0; side: double">
+        </a-plane>
+        
+        <a-plane 
+          class="menu-item-clickable"
+          menu-choice="itemName: No-Awkwardness; cost: 100"
+          position="-2.4 -1.78 0.05"
+          width="2.4"
+          height="0.22"
+          material="color: #00ff00; transparent: true; opacity: 0; side: double">
+        </a-plane>
+        
+        <a-plane 
+          class="menu-item-clickable"
+          menu-choice="itemName: Likeability Boost; cost: 100"
+          position="-2.4 -1.98 0.05"
+          width="2.4"
+          height="0.22"
+          material="color: #00ff00; transparent: true; opacity: 0; side: double">
+        </a-plane>
+
+        <!-- TECHNICAL Section (center column, x = 0, 9 items) -->
+        <a-plane 
+          class="menu-item-clickable"
+          menu-choice="itemName: Advanced Math Fluency; cost: 100"
+          position="0 -0.38 0.05"
+          width="2.4"
+          height="0.22"
+          material="color: #00ff00; transparent: true; opacity: 0; side: double">
+        </a-plane>
+        
+        <a-plane 
+          class="menu-item-clickable"
+          menu-choice="itemName: Data Analysis Literacy; cost: 100"
+          position="0 -0.58 0.05"
+          width="2.4"
+          height="0.22"
+          material="color: #00ff00; transparent: true; opacity: 0; side: double">
+        </a-plane>
+        
+        <a-plane 
+          class="menu-item-clickable"
+          menu-choice="itemName: Public Speaking Mastery; cost: 100"
+          position="0 -0.68 0.05"
+          width="2.4"
+          height="0.22"
+          material="color: #00ff00; transparent: true; opacity: 0; side: double">
+        </a-plane>
+        
+        <a-plane 
+          class="menu-item-clickable"
+          menu-choice="itemName: Financial Literacy; cost: 100"
+          position="0 -0.88 0.05"
+          width="2.4"
+          height="0.22"
+          material="color: #00ff00; transparent: true; opacity: 0; side: double">
+        </a-plane>
+        
+        <a-plane 
+          class="menu-item-clickable"
+          menu-choice="itemName: Software Proficiency (All); cost: 100"
+          position="0 -1.08 0.05"
+          width="2.4"
+          height="0.22"
+          material="color: #00ff00; transparent: true; opacity: 0; side: double">
+        </a-plane>
+        
+        <a-plane 
+          class="menu-item-clickable"
+          menu-choice="itemName: Scientific Reasoning Boost; cost: 100"
+          position="0 -1.28 0.05"
+          width="2.4"
+          height="0.22"
+          material="color: #00ff00; transparent: true; opacity: 0; side: double">
+        </a-plane>
+        
+        <a-plane 
+          class="menu-item-clickable"
+          menu-choice="itemName: Fast Research Capability; cost: 100"
+          position="0 -1.48 0.05"
+          width="2.4"
+          height="0.22"
+          material="color: #00ff00; transparent: true; opacity: 0; side: double">
+        </a-plane>
+        
+        <a-plane 
+          class="menu-item-clickable"
+          menu-choice="itemName: Memory Enhancement; cost: 100"
+          position="0 -1.68 0.05"
+          width="2.4"
+          height="0.22"
+          material="color: #00ff00; transparent: true; opacity: 0; side: double">
+        </a-plane>
+        
+        <a-plane 
+          class="menu-item-clickable"
+          menu-choice="itemName: Fluent in All Languages; cost: 100"
+          position="0 -1.88 0.05"
+          width="2.4"
+          height="0.22"
+          material="color: #00ff00; transparent: true; opacity: 0; side: double">
+        </a-plane>
+
+        <!-- SOCIAL Section (right column, x = 2.4, 7 items) -->
+        <a-plane 
+          class="menu-item-clickable"
+          menu-choice="itemName: Negotiation Ability; cost: 100"
+          position="2.4 -0.28 0.05"
+          width="2.4"
+          height="0.22"
+          material="color: #00ff00; transparent: true; opacity: 0; side: double">
+        </a-plane>
+        
+        <a-plane 
+          class="menu-item-clickable"
+          menu-choice="itemName: Client Fluency; cost: 100"
+          position="2.4 -0.48 0.05"
+          width="2.4"
+          height="0.22"
+          material="color: #00ff00; transparent: true; opacity: 0; side: double">
+        </a-plane>
+        
+        <a-plane 
+          class="menu-item-clickable"
+          menu-choice="itemName: Leadership Skill Pack; cost: 100"
+          position="2.4 -0.68 0.05"
+          width="2.4"
+          height="0.22"
+          material="color: #00ff00; transparent: true; opacity: 0; side: double">
+        </a-plane>
+        
+        <a-plane 
+          class="menu-item-clickable"
+          menu-choice="itemName: Collaboration Efficiency; cost: 100"
+          position="2.4 -0.88 0.05"
+          width="2.4"
+          height="0.22"
+          material="color: #00ff00; transparent: true; opacity: 0; side: double">
+        </a-plane>
+        
+        <a-plane 
+          class="menu-item-clickable"
+          menu-choice="itemName: Conflict Management; cost: 100"
+          position="2.4 -1.08 0.05"
+          width="2.4"
+          height="0.22"
+          material="color: #00ff00; transparent: true; opacity: 0; side: double">
+        </a-plane>
+        
+        <a-plane 
+          class="menu-item-clickable"
+          menu-choice="itemName: Multitasking Ability; cost: 100"
+          position="2.4 -1.28 0.05"
+          width="2.4"
+          height="0.22"
+          material="color: #00ff00; transparent: true; opacity: 0; side: double">
+        </a-plane>
+        
+        <a-plane 
+          class="menu-item-clickable"
+          menu-choice="itemName: Quick Learning; cost: 100"
+          position="2.4 -1.48 0.05"
+          width="2.4"
+          height="0.22"
+          material="color: #00ff00; transparent: true; opacity: 0; side: double">
+        </a-plane>
+      </a-entity>
       <a-entity gltf-model="url(/potted_plant_wk_8.glb)" position="4 0.7 -8.3" scale="0.02 0.02 0.02"></a-entity>
       <a-entity gltf-model="url(/ceiling_fluorescent_light.glb)"
                 material="emissive:#ffffff; emissiveIntensity:2"
@@ -184,100 +576,6 @@
         <a-entity gltf-model="url(/elsie_stackable_dining_chair_white.glb)" scale="2 2 2"></a-entity>
       </a-entity>
       <a-entity gltf-model="url(/long_table_and_chairs_low_poly.glb)" position="0 0 -4" rotation="0 180 0" scale="2 2 2"></a-entity>
-    
-      <!-- ============================================ -->
-      <!-- MENU SYSTEM -->
-      <!-- ============================================ -->
-      <!-- 
-        MENU SETUP INSTRUCTIONS:
-        - Menu is positioned at (-1, 1.5, -3) with width="2" and height="2.5"
-        - Menu background is centered at (0, 0, 0) relative to container
-        - Menu items are positioned relative to the container center
-        - Y coordinate: positive = higher on menu, negative = lower on menu
-        - To adjust item positions:
-          1. Open your scene and hover over menu items (they show semi-transparent on hover)
-          2. Adjust the Y value in the position attribute to match your PNG layout
-          3. Adjust width/height if needed to cover the clickable area
-        - Z coordinate (0.01) puts clickable planes slightly in front of background
-        - All items cost $100 by default (change in menu-item="cost: 100")
-      -->
-      <!-- Menu container that faces camera -->
-      <a-entity id="menu-container" position="-2 2.5 -4.2" face-camera>
-        
-        <!-- Static menu background image -->
-        <a-image 
-          id="menu-background"
-          src="/MENU.png"
-          width="2"
-          height="2.5"
-          position="0 0 0"
-          material="transparent: true; alphaTest: 0.1">
-        </a-image>
-
-        <!-- Menu Item 1: New Language -->
-        <!-- Position: Adjust Y value to match where "New Language" appears on your PNG -->
-        <!-- Typical menu layout: items spaced ~0.35 units vertically -->
-        <!-- Y=0.8 is near the top of a 2.5-unit-tall menu -->
-        <a-plane 
-          class="clickable menu-item"
-          menu-item="cost: 100; itemName: New Language"
-          position="0 0.8 0.01"
-          width="1.6"
-          height="0.25"
-          material="color: #ffffff; transparent: true; opacity: 0; side: double"
-          hover-feedback>
-        </a-plane>
-
-        <!-- Menu Item 2: Coding Literacy -->
-        <a-plane 
-          class="clickable menu-item"
-          menu-item="cost: 100; itemName: Coding Literacy"
-          position="0 0.45 0.01"
-          width="1.6"
-          height="0.25"
-          material="color: #ffffff; transparent: true; opacity: 0; side: double"
-          hover-feedback>
-        </a-plane>
-
-        <!-- Menu Item 3: Musical Ability -->
-        <a-plane 
-          class="clickable menu-item"
-          menu-item="cost: 100; itemName: Musical Ability"
-          position="0 0.1 0.01"
-          width="1.6"
-          height="0.25"
-          material="color: #ffffff; transparent: true; opacity: 0; side: double"
-          hover-feedback>
-        </a-plane>
-
-        <!-- Menu Item 4: (Add more items as needed) -->
-        <!-- Uncomment and adjust position for additional menu items -->
-        <!--
-        <a-plane 
-          class="clickable menu-item"
-          menu-item="cost: 100; itemName: Item Name"
-          position="0 -0.25 0.01"
-          width="1.6"
-          height="0.25"
-          material="color: #ffffff; transparent: true; opacity: 0; side: double"
-          hover-feedback>
-        </a-plane>
-        -->
-
-        <!-- Menu Item 5: (Add more items as needed) -->
-        <!--
-        <a-plane 
-          class="clickable menu-item"
-          menu-item="cost: 100; itemName: Item Name"
-          position="0 -0.6 0.01"
-          width="1.6"
-          height="0.25"
-          material="color: #ffffff; transparent: true; opacity: 0; side: double"
-          hover-feedback>
-        </a-plane>
-        -->
-
-      </a-entity>
 
       <!-- Money counter in 3D space (optional, if you want it in the scene) -->
       <a-text 

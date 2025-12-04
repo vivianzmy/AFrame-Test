@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>A-Frame Test</title>
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+    <!-- Animation mixer for skinned GLB animations (Mixamo, etc.) -->
+    <script src="https://cdn.jsdelivr.net/npm/aframe-extras@6.1.1/dist/aframe-extras.min.js"></script>
     <script>
       // ============================================
       // FACE CAMERA COMPONENT
@@ -281,6 +283,11 @@
   <body>
     <div id="hud">$1000</div>
     <a-scene>
+      <!-- Assets -->
+      <a-assets>
+        <!-- Mixamo sitting idle character -->
+        <a-asset-item id="sittingModel" src="/Sitting Idle (3).glb"></a-asset-item>
+      </a-assets>
       <!-- Camera with mouse-based raycaster for desktop interaction -->
       <!-- 
         MOUSE RAYCASTER SETUP:
@@ -588,11 +595,15 @@
         visible="false"        
         look-at="#camera">
       </a-text>
-      <a-box 
-              position="0.7 1.5 -4.9" 
-              color="#FF0000" 
-              scale="0.9 0.9 0.9">
-      </a-box>
+      <!-- Sitting character model (Mixamo GLB) replacing the red box -->
+      <a-entity 
+        id="sittingPerson"
+        gltf-model="#sittingModel"
+        animation-mixer="clip: *; loop: repeat; reorient: true; startAt: 0.5;"
+        position="0.7 1.0 -4.9"
+        rotation="0 0 0"
+        scale="0.9 0.9 0.9">
+      </a-entity>
       <a-plane 
                position="0 0 -4" 
                rotation="-90 0 0" 

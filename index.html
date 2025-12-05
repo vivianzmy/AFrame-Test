@@ -56,7 +56,16 @@
         },
         
         applyFix: function() {
-          const mesh = this.el.getObject3D('mesh');
+          // Handle a-image elements (plane geometry)
+          let mesh = this.el.getObject3D('mesh');
+          if (!mesh) {
+            // For a-image, try to get the plane mesh
+            const object3D = this.el.object3D;
+            if (object3D && object3D.children && object3D.children.length > 0) {
+              mesh = object3D.children.find(child => child.type === 'Mesh');
+            }
+          }
+          
           if (!mesh) return;
           
           const material = mesh.material;
@@ -65,17 +74,25 @@
           const texture = material.map;
           if (!texture) return;
           
-          // Fix texture settings
+          // Fix texture settings to prevent white halo at distance
+          // Disable mipmaps to prevent alpha bleeding from mipmap filtering at distance
           texture.generateMipmaps = false;
+          // Use LinearFilter for both - without mipmaps, this prevents distance artifacts
           texture.minFilter = THREE.LinearFilter;
           texture.magFilter = THREE.LinearFilter;
-          texture.premultiplyAlpha = true;
+          // PNGs are typically NOT premultiplied, so set to false
+          // Premultiplied alpha can cause white halos if the PNG isn't actually premultiplied
+          texture.premultiplyAlpha = false;
           texture.needsUpdate = true;
           
           // Fix material settings
           material.transparent = true;
-          material.premultipliedAlpha = true;
-          material.alphaTest = 0.1;
+          // Match premultipliedAlpha with texture setting
+          material.premultipliedAlpha = false;
+          // Increase alphaTest to cut off more edge pixels and prevent white fringe
+          material.alphaTest = 0.5;
+          // Use proper blending to avoid halo artifacts
+          material.blending = THREE.NormalBlending;
           material.side = THREE.DoubleSide;
           material.needsUpdate = true;
           
@@ -342,6 +359,16 @@
           src="/MENU-02.png"
           position="-4.8 -1 2.3"
           scale="1.6 1.6 1.6"
+          rotation="0 90 0"
+          width="8"
+          height="5.18"
+          material="transparent: true; alphaTest: 0.1; shader: flat; side: double"
+          fix-png-transparency>
+        </a-image>
+        <a-image 
+          src="/bodyparts.png"
+          position="-4.9 -1 4.9"
+          scale="0.8 0.8 0.8"
           rotation="0 90 0"
           width="8"
           height="5.18"

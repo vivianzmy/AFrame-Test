@@ -139,7 +139,10 @@
         toast.setAttribute('id', 'toast-notification');
         toast.setAttribute('value', `+ ${itemName}`);
         // Camera-local coordinates for bottom-left corner
-        toast.setAttribute('position', '-1.6 -0.7 -1');
+        const toastX = -1.6;
+        const toastY = -0.7;
+        const toastZ = -1;
+        toast.setAttribute('position', `${toastX} ${toastY} ${toastZ}`);
         toast.setAttribute('align', 'left');
         toast.setAttribute('color', '#4dcc4d');
         toast.setAttribute('scale', '0.3 0.3 0.3');
@@ -582,7 +585,11 @@
       <a-entity position="0 0 -2.5" rotation="0 180 0" scale="0.01 0.01 0.01">
         <a-entity gltf-model="url(/elsie_stackable_dining_chair_white.glb)" scale="2 2 2"></a-entity>
       </a-entity>
+      <a-entity gltf-model="url(/door_with_frame.glb)" position="0 0 1" rotation="0 180 0" scale="0.02 0.02 0.02"></a-entity>
+      <a-entity gltf-model="url(/window_blind02_-_2mb.glb)" position="2.8 4.3 0.8" rotation="0 90 0" scale="1.6 1.6 1.6"></a-entity>
+      <a-entity gltf-model="url(/window_blind02_-_2mb.glb)" position="-2.8 4.3 0.8" rotation="0 90 0" scale="1.6 1.6 1.6"></a-entity>
       <a-entity gltf-model="url(/long_table_and_chairs_low_poly.glb)" position="0 0 -4" rotation="0 180 0" scale="2 2 2"></a-entity>
+      <a-entity gltf-model="url(/tablet_folder.glb)" position="0.5 1.45 -4" rotation="0 90 0" scale="0.02 0.02 0.02"></a-entity>
 
       <!-- Money counter in 3D space (optional, if you want it in the scene) -->
       <a-text 

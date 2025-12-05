@@ -258,13 +258,13 @@
           // The mouse raycaster will only trigger this if the mouse cursor is over this entity
           this.el.addEventListener('click', this.handleClick);
           
-          // Hover feedback: only change opacity on mouseenter/mouseleave
-          this.el.addEventListener('mouseenter', () => {
-            this.el.setAttribute('material', 'opacity', 0.2);
-          });
-          this.el.addEventListener('mouseleave', () => {
-            this.el.setAttribute('material', 'opacity', 0);
-          });
+          // Hover feedback disabled - hitboxes remain invisible at all times
+          // this.el.addEventListener('mouseenter', () => {
+          //   this.el.setAttribute('material', 'opacity', 0.12);
+          // });
+          // this.el.addEventListener('mouseleave', () => {
+          //   this.el.setAttribute('material', 'opacity', 0);
+          // });
         },
         
         remove: function() {

@@ -107,11 +107,27 @@
         }
       }
 
+      // Flash money display red when deducted
+      function flashMoneyRed() {
+        const hud = document.querySelector('#hud');
+        if (hud) {
+          // Store original color
+          const originalColor = hud.style.color || '#565656';
+          // Change to red
+          hud.style.color = '#ff0000';
+          // Restore original color after 1 second
+          setTimeout(() => {
+            hud.style.color = originalColor;
+          }, 1000);
+        }
+      }
+
       // Deduct cost from money (prevents going negative)
       function deductCost(cost) {
         if (money >= cost) {
           money -= cost;
           updateMoneyDisplay();
+          flashMoneyRed(); // Flash red when money is deducted
           return true;
         }
         return false;

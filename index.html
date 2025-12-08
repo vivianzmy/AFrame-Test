@@ -372,16 +372,84 @@
           material="transparent: true; alphaTest: 0.1; shader: flat; side: double"
           fix-png-transparency>
         </a-image>
-        <a-image 
-          src="/bodyparts.png"
+        <!-- Bodyparts Container -->
+        <a-entity
+          id="bodyparts-container"
           position="-4.9 -1 4.9"
-          scale="0.8 0.8 0.8"
           rotation="0 90 0"
-          width="8"
-          height="5.18"
-          material="transparent: true; alphaTest: 0.1; shader: flat; side: double"
-          fix-png-transparency>
-        </a-image>
+          scale="0.8 0.8 0.8">
+          <a-image 
+            src="/bodyparts.png"
+            position="0 0 0"
+            width="8"
+            height="5.18"
+            material="transparent: true; alphaTest: 0.1; shader: flat; side: double"
+            fix-png-transparency>
+          </a-image>
+          
+          <!-- Clickable colliders for bodyparts (7 total) -->
+          <!-- Top row -->
+          <a-plane 
+            class="menu-item-clickable"
+            menu-choice="itemName: Height Extension; cost: 100"
+            position="-2.5 1.5 0.02"
+            width="1.2"
+            height="0.8"
+            material="color: #00ff00; transparent: true; opacity: 0; side: double">
+          </a-plane>
+          <a-plane 
+            class="menu-item-clickable"
+            menu-choice="itemName: Shoulder Width; cost: 100"
+            position="-0.8 1.5 0.02"
+            width="1.2"
+            height="0.8"
+            material="color: #00ff00; transparent: true; opacity: 0; side: double">
+          </a-plane>
+          <a-plane 
+            class="menu-item-clickable"
+            menu-choice="itemName: Breast Adjustments; cost: 100"
+            position="0.8 1.5 0.02"
+            width="1.2"
+            height="0.8"
+            material="color: #00ff00; transparent: true; opacity: 0; side: double">
+          </a-plane>
+          
+          <!-- Middle row -->
+          <a-plane 
+            class="menu-item-clickable"
+            menu-choice="itemName: Waist Sculpting; cost: 100"
+            position="-2.5 0 0.02"
+            width="1.2"
+            height="0.9"
+            material="color: #00ff00; transparent: true; opacity: 0; side: double">
+          </a-plane>
+          <a-plane 
+            class="menu-item-clickable"
+            menu-choice="itemName: Ab Etching; cost: 100"
+            position="-0.8 0 0.02"
+            width="1.2"
+            height="0.9"
+            material="color: #00ff00; transparent: true; opacity: 0; side: double">
+          </a-plane>
+          <a-plane 
+            class="menu-item-clickable"
+            menu-choice="itemName: Arm Slimming; cost: 100"
+            position="0.8 0 0.02"
+            width="1.2"
+            height="0.9"
+            material="color: #00ff00; transparent: true; opacity: 0; side: double">
+          </a-plane>
+          
+          <!-- Bottom row -->
+          <a-plane 
+            class="menu-item-clickable"
+            menu-choice="itemName: Butt Implants; cost: 100"
+            position="-1.6 -1.5 0.02"
+            width="2.4"
+            height="1.0"
+            material="color: #00ff00; transparent: true; opacity: 0; side: double">
+          </a-plane>
+        </a-entity>
         <a-image 
           src="/MENU-03.png"
           position="4.8 -1.5 7.9"

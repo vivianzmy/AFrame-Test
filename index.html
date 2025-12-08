@@ -211,14 +211,15 @@
         // Create toast element - attached to camera as HUD
         const toast = document.createElement('a-text');
         toast.setAttribute('id', 'toast-notification');
-        toast.setAttribute('value', `+ ${itemName}`);
+        toast.setAttribute('value', `+ ${itemName.toUpperCase()}`);
         // Camera-local coordinates for bottom-left corner
-        const toastX = -1.6;
-        const toastY = -0.7;
+        const toastX = -1.2;
+        const toastY = -0.75;
         const toastZ = -1;
         toast.setAttribute('position', `${toastX} ${toastY} ${toastZ}`);
         toast.setAttribute('align', 'left');
         toast.setAttribute('color', '#4dcc4d');
+        toast.setAttribute('font', 'roboto');
         toast.setAttribute('scale', '0.3 0.3 0.3');
         toast.setAttribute('opacity', '0');
         
@@ -370,7 +371,7 @@
         color: #565656;
         font-size: 32px;
         font-weight: bold;
-        font-family: Arial, sans-serif;
+        font-family: "MiSans Bold", MiSans, sans-serif;
         pointer-events: none;
         z-index: 9999;
       }
@@ -382,7 +383,7 @@
         font-size: 12px;
         font-family: "MiSans Light", MiSans, sans-serif;
         background: #ffffff;
-        color: #333;
+        color: #e06562;
         border: 1px solid #ccc;
         border-radius: 8px;
         cursor: pointer;

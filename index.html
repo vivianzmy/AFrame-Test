@@ -111,6 +111,47 @@
       let money = 1000;
       const ITEM_COST = 100;
 
+      // ============================================
+      // CART SYSTEM
+      // ============================================
+      let cartItems = [];
+
+      // Add item to cart
+      function addToCart(itemName) {
+        cartItems.push(itemName);
+        updateCartUI();
+      }
+
+      // Update cart UI display
+      function updateCartUI() {
+        const cartList = document.getElementById('cart-list');
+        const cartTotalEl = document.getElementById('cart-total');
+        
+        if (!cartList) return;
+        
+        // Clear existing items
+        cartList.innerHTML = '';
+        
+        // Add each cart item with price
+        cartItems.forEach(item => {
+          const itemDiv = document.createElement('div');
+          itemDiv.innerHTML = `
+            <span>${item.toUpperCase()}</span>
+            <span>$100</span>
+          `;
+          cartList.appendChild(itemDiv);
+        });
+        
+        // Update total
+        if (cartTotalEl) {
+          const total = cartItems.length * 100;
+          cartTotalEl.innerHTML = `
+            <span>TOTAL</span>
+            <span>$${total}</span>
+          `;
+        }
+      }
+
       // Update money display
       function updateMoneyDisplay() {
         const moneyText = document.querySelector('#money-text');
@@ -248,6 +289,8 @@
               // Show toast notification with the exact item name from the clicked entity
               // The toast text is updated based on the clicked item's itemName property
               showToast(itemName);
+              // Add to cart
+              addToCart(itemName);
               console.log(`Purchased: ${itemName} for $${cost}. Remaining: $${money}`);
             } else {
               console.log(`Insufficient funds! Need $${cost}, have $${money}`);
@@ -305,6 +348,16 @@
           } else {
             console.error('mouseCursor element not found!');
           }
+
+          // Cart button toggle logic
+          const cartButton = document.getElementById('cart-button');
+          const cartPanel = document.getElementById('cart-panel');
+
+          if (cartButton && cartPanel) {
+            cartButton.addEventListener('click', () => {
+              cartPanel.classList.toggle('open');
+            });
+          }
         });
       });
     </script>
@@ -321,10 +374,81 @@
         pointer-events: none;
         z-index: 9999;
       }
+      #cart-button {
+        position: fixed;
+        left: 20px;
+        bottom: 20px;
+        padding: 8px 14px;
+        font-size: 12px;
+        font-family: "MiSans Light", MiSans, sans-serif;
+        background: #ffffff;
+        color: #333;
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        cursor: pointer;
+        text-transform: uppercase;
+        z-index: 10000;
+      }
+      #cart-panel {
+        position: fixed;
+        left: 20px;
+        bottom: 60px;
+        width: 240px;
+        max-height: 220px;
+        background: #e06562;
+        border-radius: 10px;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+        overflow: hidden;
+        font-family: "MiSans Light", MiSans, sans-serif;
+        font-size: 11px;
+        color: #ffffff;
+        z-index: 10000;
+        transform: translateY(110%);
+        opacity: 0;
+        pointer-events: none;
+        transition: transform 0.25s ease-out, opacity 0.25s ease-out;
+      }
+      #cart-panel.open {
+        transform: translateY(0%);
+        opacity: 1;
+        pointer-events: auto;
+      }
+      #cart-panel-header {
+        font-weight: 600;
+        padding: 8px 12px;
+        border-bottom: 1px solid rgba(255,255,255,0.25);
+        text-transform: uppercase;
+      }
+      #cart-list {
+        overflow-y: auto;
+        max-height: 150px;
+      }
+      #cart-list > div {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 6px 12px;
+        border-bottom: 1px solid rgba(255,255,255,0.15);
+        text-transform: uppercase;
+      }
+      #cart-total {
+        padding: 8px 12px;
+        font-weight: 600;
+        border-top: 1px solid rgba(255,255,255,0.25);
+        display: flex;
+        justify-content: space-between;
+        text-transform: uppercase;
+      }
     </style>
   </head>
   <body>
     <div id="hud">$1000</div>
+    <div id="cart-button">My Cart</div>
+    <div id="cart-panel">
+      <div id="cart-panel-header">My Cart</div>
+      <div id="cart-list"></div>
+      <div id="cart-total"></div>
+    </div>
     <a-scene>
       <!-- Assets -->
       <a-assets>

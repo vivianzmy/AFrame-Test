@@ -240,6 +240,19 @@
         }, 1000);
       }
 
+      // Show insufficient balance popup
+      function showInsufficientBalance() {
+        const popup = document.getElementById('insufficient-popup');
+        if (!popup) return;
+
+        popup.textContent = "INSUFFICIENT BALANCE";
+        popup.classList.add('show');
+
+        setTimeout(() => {
+          popup.classList.remove('show');
+        }, 1000);
+      }
+
       // ============================================
       // MENU CHOICE COMPONENT
       // ============================================
@@ -295,6 +308,7 @@
               console.log(`Purchased: ${itemName} for $${cost}. Remaining: $${money}`);
             } else {
               console.log(`Insufficient funds! Need $${cost}, have $${money}`);
+              showInsufficientBalance();
             }
           };
           
@@ -440,6 +454,27 @@
         justify-content: space-between;
         text-transform: uppercase;
       }
+      #insufficient-popup {
+        position: fixed;
+        left: 50%;
+        bottom: 40px;
+        transform: translateX(-50%);
+        background: #e06562;
+        color: #ffffff;
+        font-family: "MiSans Light", MiSans, sans-serif;
+        padding: 10px 20px;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 300;
+        text-transform: uppercase;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.25s ease-out;
+        z-index: 20000;
+      }
+      #insufficient-popup.show {
+        opacity: 1;
+      }
     </style>
   </head>
   <body>
@@ -450,6 +485,7 @@
       <div id="cart-list"></div>
       <div id="cart-total"></div>
     </div>
+    <div id="insufficient-popup"></div>
     <a-scene>
       <!-- Assets -->
       <a-assets>

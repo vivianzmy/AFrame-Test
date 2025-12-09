@@ -297,6 +297,44 @@
         typeNext();
       }
 
+      // Export summary screen as PDF
+      async function exportSummaryAsPDF() {
+        const summaryScreen = document.getElementById('summary-screen');
+        if (!summaryScreen) return;
+
+        // Use html2canvas to capture the summary area
+        const canvas = await html2canvas(summaryScreen, {
+          scale: 2,           // higher resolution
+          useCORS: true
+        });
+        const imgData = canvas.toDataURL('image/png');
+
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF('p', 'mm', 'a4');
+
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const pageHeight = pdf.internal.pageSize.getHeight();
+
+        const imgWidth = pageWidth;
+        const imgHeight = canvas.height * imgWidth / canvas.width;
+
+        let y = 0;
+        if (imgHeight > pageHeight) {
+          // If taller than a single page, scale to fit height instead
+          const ratio = pageHeight / imgHeight;
+          const scaledWidth = imgWidth * ratio;
+          const scaledHeight = imgHeight * ratio;
+          const x = (pageWidth - scaledWidth) / 2;
+          pdf.addImage(imgData, 'PNG', x, 0, scaledWidth, scaledHeight);
+        } else {
+          const x = 0;
+          y = (pageHeight - imgHeight) / 2;
+          pdf.addImage(imgData, 'PNG', x, y, imgWidth, imgHeight);
+        }
+
+        pdf.save('purchase-summary.pdf');
+      }
+
       // ============================================
       // MENU CHOICE COMPONENT
       // ============================================
@@ -435,6 +473,14 @@
 
               // Show summary with typewriter effect
               showSummaryScreen();
+            });
+          }
+
+          // EXPORT button handler
+          const exportButton = document.getElementById('export-button');
+          if (exportButton) {
+            exportButton.addEventListener('click', () => {
+              exportSummaryAsPDF();
             });
           }
         });
@@ -600,6 +646,23 @@
         text-transform: none;
         outline: none;
       }
+      #export-button {
+        display: block;
+        margin: 40px auto 20px auto;
+        padding: 10px 26px;
+        font-size: 13px;
+        font-family: "MiSans Light", MiSans, sans-serif;
+        text-transform: uppercase;
+        background: #3ba96b;
+        color: #ffffff;
+        border: none;
+        border-radius: 999px;
+        cursor: pointer;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+      }
+      #export-button:hover {
+        opacity: 0.9;
+      }
       .a-enter-vr, 
       .a-enter-ar, 
       .a-enter-fullscreen {
@@ -641,6 +704,7 @@
           <input id="occupation" type="text" />
         </div>
       </div>
+      <button id="export-button">EXPORT</button>
     </div>
     <a-scene>
       <!-- Assets -->
@@ -1191,6 +1255,8 @@
       </a-plane>
       <a-sky color="#ECECEC"></a-sky>
     </a-scene>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   </body>
   </html>
 

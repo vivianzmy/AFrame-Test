@@ -253,6 +253,50 @@
         }, 1000);
       }
 
+      // Show summary screen with typewriter effect
+      function showSummaryScreen() {
+        const summaryScreen = document.getElementById('summary-screen');
+        const summaryContent = document.getElementById('summary-content');
+        if (!summaryScreen || !summaryContent) return;
+
+        // Build summary text from cartItems (each item = $100)
+        let lines = [];
+        lines.push('PURCHASE SUMMARY');
+        lines.push('');
+
+        if (cartItems.length === 0) {
+          lines.push('NO ITEMS SELECTED.');
+        } else {
+          cartItems.forEach(item => {
+            lines.push(`- ${item.toUpperCase()}   $100`);
+          });
+        }
+
+        lines.push('');
+        const total = cartItems.length * 100;
+        lines.push(`TOTAL: $${total}`);
+
+        const fullText = lines.join('\n');
+
+        // Prepare screen
+        summaryScreen.style.display = 'block';
+        summaryContent.textContent = '';
+
+        // Typewriter effect
+        let i = 0;
+        const speed = 30; // ms per character
+
+        function typeNext() {
+          if (i <= fullText.length) {
+            summaryContent.textContent = fullText.slice(0, i);
+            i++;
+            setTimeout(typeNext, speed);
+          }
+        }
+
+        typeNext();
+      }
+
       // ============================================
       // MENU CHOICE COMPONENT
       // ============================================
@@ -373,6 +417,26 @@
               cartPanel.classList.toggle('open');
             });
           }
+
+          // DONE button handler
+          const doneButton = document.getElementById('done-button');
+          const summaryScreen = document.getElementById('summary-screen');
+
+          if (doneButton && summaryScreen) {
+            doneButton.addEventListener('click', () => {
+              // Hide A-Frame scene and HUD UI
+              if (scene) scene.style.display = 'none';
+              const hud = document.getElementById('hud');
+              if (hud) hud.style.display = 'none';
+              if (cartButton) cartButton.style.display = 'none';
+              if (cartPanel) cartPanel.style.display = 'none';
+              const insufficientPopup = document.getElementById('insufficient-popup');
+              if (insufficientPopup) insufficientPopup.style.display = 'none';
+
+              // Show summary with typewriter effect
+              showSummaryScreen();
+            });
+          }
         });
       });
     </script>
@@ -475,6 +539,41 @@
       #insufficient-popup.show {
         opacity: 1;
       }
+      #done-button {
+        position: fixed;
+        right: 20px;
+        bottom: 20px;
+        padding: 8px 18px;
+        font-size: 12px;
+        font-family: "MiSans Light", MiSans, sans-serif;
+        background: #3ba96b;
+        color: #ffffff;
+        border: none;
+        border-radius: 999px;
+        cursor: pointer;
+        text-transform: uppercase;
+        z-index: 10000;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+      }
+      #summary-screen {
+        position: fixed;
+        inset: 0;
+        background: #ffffff;
+        color: #000000;
+        display: none;
+        z-index: 20000;
+        font-family: "MiSans Light", MiSans, sans-serif;
+        padding: 40px;
+        box-sizing: border-box;
+      }
+      #summary-content {
+        max-width: 700px;
+        margin: 0 auto;
+        white-space: pre-wrap;
+        font-size: 16px;
+        line-height: 1.6;
+        text-transform: uppercase;
+      }
       .a-enter-vr, 
       .a-enter-ar, 
       .a-enter-fullscreen {
@@ -495,6 +594,10 @@
       <div id="cart-total"></div>
     </div>
     <div id="insufficient-popup"></div>
+    <div id="done-button">DONE</div>
+    <div id="summary-screen">
+      <div id="summary-content"></div>
+    </div>
     <a-scene>
       <!-- Assets -->
       <a-assets>

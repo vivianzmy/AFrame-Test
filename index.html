@@ -568,11 +568,37 @@
       }
       #summary-content {
         max-width: 700px;
-        margin: 0 auto;
+        margin: 0 auto 40px auto;
         white-space: pre-wrap;
         font-size: 16px;
         line-height: 1.6;
         text-transform: uppercase;
+      }
+      #user-info {
+        max-width: 700px;
+        margin: 0 auto;
+        font-size: 14px;
+        text-transform: uppercase;
+      }
+      #user-info .user-field {
+        display: flex;
+        align-items: center;
+        margin-bottom: 12px;
+      }
+      #user-info label {
+        width: 140px;
+        font-weight: 400;
+        letter-spacing: 0.05em;
+      }
+      #user-info input {
+        flex: 1;
+        border: none;
+        border-bottom: 1px solid #000;
+        padding: 4px 2px;
+        font-family: "MiSans Light", MiSans, sans-serif;
+        font-size: 14px;
+        text-transform: none;
+        outline: none;
       }
       .a-enter-vr, 
       .a-enter-ar, 
@@ -597,6 +623,24 @@
     <div id="done-button">DONE</div>
     <div id="summary-screen">
       <div id="summary-content"></div>
+      <div id="user-info">
+        <div class="user-field">
+          <label for="first-name">NAME:</label>
+          <input id="first-name" type="text" />
+        </div>
+        <div class="user-field">
+          <label for="last-name">LAST NAME:</label>
+          <input id="last-name" type="text" />
+        </div>
+        <div class="user-field">
+          <label for="age">AGE:</label>
+          <input id="age" type="text" />
+        </div>
+        <div class="user-field">
+          <label for="occupation">OCCUPATION:</label>
+          <input id="occupation" type="text" />
+        </div>
+      </div>
     </div>
     <a-scene>
       <!-- Assets -->

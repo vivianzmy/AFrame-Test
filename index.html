@@ -106,6 +106,39 @@
       });
 
       // ============================================
+      // FORCE MODEL COLOR COMPONENT
+      // ============================================
+      AFRAME.registerComponent('force-model-color', {
+        schema: {
+          color: { type: 'color', default: '#ffffff' }
+        },
+        init: function() {
+          this.applyColor = this.applyColor.bind(this);
+          this.el.addEventListener('model-loaded', this.applyColor);
+        },
+        applyColor: function() {
+          const mesh = this.el.getObject3D('mesh');
+          if (!mesh) return;
+          mesh.traverse((node) => {
+            if (node.isMesh && node.material) {
+              if (Array.isArray(node.material)) {
+                node.material.forEach((mat) => {
+                  mat.color = new THREE.Color(this.data.color);
+                  mat.needsUpdate = true;
+                });
+              } else {
+                node.material.color = new THREE.Color(this.data.color);
+                node.material.needsUpdate = true;
+              }
+            }
+          });
+        },
+        remove: function() {
+          this.el.removeEventListener('model-loaded', this.applyColor);
+        }
+      });
+
+      // ============================================
       // MONEY MANAGEMENT SYSTEM
       // ============================================
       let money = 1000;
@@ -195,48 +228,14 @@
       // TOAST NOTIFICATION SYSTEM
       // ============================================
       function showToast(itemName) {
-        // Get camera
-        const camera = document.querySelector('#camera');
-        if (!camera) {
-          console.error('Camera not found!');
-          return;
-        }
+        const toastHud = document.getElementById('toast-hud');
+        if (!toastHud) return;
 
-        // Remove existing toast if any
-        const existingToast = document.querySelector('#toast-notification');
-        if (existingToast) {
-          existingToast.parentNode.removeChild(existingToast);
-        }
+        toastHud.textContent = `+ ${itemName.toUpperCase()}`;
+        toastHud.classList.add('show');
 
-        // Create toast element - attached to camera as HUD
-        const toast = document.createElement('a-text');
-        toast.setAttribute('id', 'toast-notification');
-        toast.setAttribute('value', `+ ${itemName.toUpperCase()}`);
-        // Camera-local coordinates for bottom-left corner
-        const toastX = -1.2;
-        const toastY = -0.75;
-        const toastZ = -1;
-        toast.setAttribute('position', `${toastX} ${toastY} ${toastZ}`);
-        toast.setAttribute('align', 'left');
-        toast.setAttribute('color', '#4dcc4d');
-        toast.setAttribute('font', 'roboto');
-        toast.setAttribute('scale', '0.3 0.3 0.3');
-        toast.setAttribute('opacity', '0');
-        
-        // Attach to camera (not scene) - this makes it behave like a HUD
-        camera.appendChild(toast);
-
-        // Fade in animation
-        toast.setAttribute('animation__fadein', 'property: opacity; from: 0; to: 1; dur: 200');
-        
-        // After 1 second, fade out and remove
         setTimeout(() => {
-          toast.setAttribute('animation__fadeout', 'property: opacity; from: 1; to: 0; dur: 300');
-          setTimeout(() => {
-            if (toast.parentNode) {
-              toast.parentNode.removeChild(toast);
-            }
-          }, 300);
+          toastHud.classList.remove('show');
         }, 1000);
       }
 
@@ -257,6 +256,12 @@
       function showSummaryScreen() {
         const summaryScreen = document.getElementById('summary-screen');
         const summaryContent = document.getElementById('summary-content');
+        const summaryDate = document.getElementById('summary-date');
+        const summaryPhysicalSpend = document.getElementById('summary-physical-spend');
+        const summarySkillSpend = document.getElementById('summary-skill-spend');
+        const summaryPhysicalShare = document.getElementById('summary-physical-share');
+        const summarySkillShare = document.getElementById('summary-skill-share');
+        const summaryPerfectionRating = document.getElementById('summary-perfection-rating');
         if (!summaryScreen || !summaryContent) return;
 
         // Build summary text from cartItems (each item = $100)
@@ -264,23 +269,77 @@
         lines.push('PURCHASE SUMMARY');
         lines.push('');
 
+        const itemWidth = 28;
+        const amountLabel = 'AMOUNT';
+        lines.push(`${'ITEM'.padEnd(itemWidth, ' ')}${amountLabel}`);
+        lines.push(''.padEnd(itemWidth + amountLabel.length, '.'));
+
         if (cartItems.length === 0) {
           lines.push('NO ITEMS SELECTED.');
         } else {
           cartItems.forEach(item => {
-            lines.push(`- ${item.toUpperCase()}   $100`);
+            const itemText = item.toUpperCase();
+            lines.push(`${itemText.padEnd(itemWidth, '.')} $100`);
           });
         }
 
         lines.push('');
         const total = cartItems.length * 100;
-        lines.push(`TOTAL: $${total}`);
+        lines.push(`${'TOTAL'.padEnd(itemWidth, '.')} $${total}`);
 
         const fullText = lines.join('\n');
+
+        const physicalItems = new Set([
+          'Height Extension',
+          'Shoulder Width',
+          'Breast Adjustments',
+          'Waist Sculpting',
+          'Ab Etching',
+          'Arm Slimming',
+          'Butt Implants',
+          'Eye Color',
+          'Eyelid Alteration',
+          'Brow Lift',
+          'Nose Job',
+          'Lip Shape',
+          'Cheekbone Alteration',
+          'Smile Brightening',
+          'Skin Texture Smoothing',
+          'Jawline Altercation',
+          'Face Lift'
+        ]);
+
+        let physicalCount = 0;
+        let skillCount = 0;
+
+        cartItems.forEach((item) => {
+          if (physicalItems.has(item)) {
+            physicalCount += 1;
+          } else {
+            skillCount += 1;
+          }
+        });
+
+        const physicalSpend = physicalCount * 100;
+        const skillSpend = skillCount * 100;
+        const totalCount = cartItems.length;
+        const physicalShare = totalCount ? Math.round((physicalCount / totalCount) * 100) : 0;
+        const skillShare = totalCount ? Math.round((skillCount / totalCount) * 100) : 0;
+
+        const ratingBase = Math.min(100, 50 + totalCount * 5);
+        const perfectionRating = `${ratingBase}/100`;
 
         // Prepare screen
         summaryScreen.style.display = 'block';
         summaryContent.textContent = '';
+        if (summaryDate) {
+          summaryDate.textContent = new Date().toLocaleDateString();
+        }
+        if (summaryPhysicalSpend) summaryPhysicalSpend.textContent = `$${physicalSpend}`;
+        if (summarySkillSpend) summarySkillSpend.textContent = `$${skillSpend}`;
+        if (summaryPhysicalShare) summaryPhysicalShare.textContent = `${physicalShare}%`;
+        if (summarySkillShare) summarySkillShare.textContent = `${skillShare}%`;
+        if (summaryPerfectionRating) summaryPerfectionRating.textContent = perfectionRating;
 
         // Typewriter effect
         let i = 0;
@@ -485,9 +544,193 @@
           }
         });
       });
+
+      document.addEventListener('DOMContentLoaded', () => {
+        const startScreen = document.getElementById('start-screen');
+        const infoScreen = document.getElementById('info-screen');
+        const enterButton = document.getElementById('enter-button');
+        const infoForm = document.getElementById('info-form');
+
+        const scene = document.querySelector('a-scene');
+        const userSummaryTop = document.getElementById('user-summary-top');
+        const toastHud = document.getElementById('toast-hud');
+        const hud = document.getElementById('hud');
+        const cartButton = document.getElementById('cart-button');
+        const cartPanel = document.getElementById('cart-panel');
+        const doneButton = document.getElementById('done-button');
+        const insufficientPopup = document.getElementById('insufficient-popup');
+
+        const appElements = [scene, userSummaryTop, toastHud, hud, cartButton, cartPanel, doneButton, insufficientPopup];
+
+        const hideApp = () => {
+          appElements.forEach((el) => {
+            if (el) el.style.display = 'none';
+          });
+        };
+
+        const showApp = () => {
+          appElements.forEach((el) => {
+            if (el) el.style.display = '';
+          });
+          if (userSummaryTop) {
+            userSummaryTop.style.display = 'block';
+          }
+          if (scene && scene.resize) {
+            scene.resize();
+          }
+          window.dispatchEvent(new Event('resize'));
+        };
+
+        hideApp();
+
+        if (enterButton && startScreen && infoScreen) {
+          enterButton.addEventListener('click', () => {
+            startScreen.classList.add('hidden');
+            infoScreen.classList.remove('hidden');
+            document.body.style.background = '#ffffff';
+          });
+        }
+
+        if (infoForm && infoScreen) {
+          infoForm.addEventListener('submit', (event) => {
+            event.preventDefault();
+
+            const nameInput = document.getElementById('info-name');
+            const genderInput = document.getElementById('info-gender');
+            const ageInput = document.getElementById('info-age');
+            const occupationInput = document.getElementById('info-occupation');
+            const incomeInput = document.getElementById('info-income');
+
+            const summaryName = document.getElementById('summary-name');
+            const summaryGender = document.getElementById('summary-gender');
+            const summaryAge = document.getElementById('summary-age');
+            const summaryOccupation = document.getElementById('summary-occupation');
+            const summaryIncome = document.getElementById('summary-income');
+
+            const nameValue = nameInput ? nameInput.value.trim() : '';
+            const genderValue = genderInput ? genderInput.value.trim() : '';
+            const ageValue = ageInput ? ageInput.value.trim() : '';
+            const occupationValue = occupationInput ? occupationInput.value.trim() : '';
+            const incomeValue = incomeInput ? incomeInput.value.trim() : '';
+
+            if (summaryName) summaryName.value = nameValue;
+            if (summaryGender) summaryGender.value = genderValue;
+            if (summaryAge) summaryAge.value = ageValue;
+            if (summaryOccupation) summaryOccupation.value = occupationValue;
+            if (summaryIncome) summaryIncome.value = incomeValue;
+
+            if (userSummaryTop) {
+              userSummaryTop.textContent =
+                `NAME: ${nameValue}  •  ` +
+                `GENDER: ${genderValue}  •  ` +
+                `AGE: ${ageValue}  •  ` +
+                `OCCUPATION: ${occupationValue}  •  ` +
+                `INCOME: ${incomeValue}`;
+            }
+
+            infoScreen.classList.add('hidden');
+            document.body.style.background = '';
+            showApp();
+          });
+        }
+      });
     </script>
     <style>
       html, body { margin: 0; height: 100%; }
+      body {
+        background: #000000;
+        font-family: "MiSans Light", MiSans, sans-serif;
+      }
+      .screen {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        background: #000000;
+        color: #ffffff;
+        z-index: 30000;
+      }
+      .screen.hidden {
+        display: none;
+      }
+      #enter-button {
+        padding: 12px 32px;
+        border: 1px solid #ffffff;
+        background: transparent;
+        color: #ffffff;
+        font-size: 20px;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        cursor: pointer;
+        font-family: "MiSans Light", MiSans, sans-serif;
+      }
+      #enter-button:hover {
+        background: #ffffff;
+        color: #000000;
+      }
+      #info-screen {
+        background: #ffffff;
+        color: #000000;
+      }
+      #info-form {
+        width: min(520px, 90vw);
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+      }
+      .info-field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .info-field label {
+        font-size: 12px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      .info-field input,
+      .info-field select {
+        border: none;
+        border-bottom: 1px solid #000000;
+        padding: 6px 2px;
+        font-family: "MiSans Light", MiSans, sans-serif;
+        font-size: 16px;
+        background: transparent;
+        outline: none;
+      }
+      #continue-button {
+        margin-top: 12px;
+        align-self: center;
+        padding: 10px 28px;
+        border: 1px solid #000000;
+        background: #000000;
+        color: #ffffff;
+        font-size: 14px;
+        text-transform: uppercase;
+        letter-spacing: 0.14em;
+        cursor: pointer;
+        font-family: "MiSans Light", MiSans, sans-serif;
+      }
+      #user-summary-top {
+        position: fixed;
+        top: 12px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: none;
+        padding: 6px 12px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.55);
+        color: #000000;
+        font-size: 12px;
+        font-family: "MiSans Light", MiSans, sans-serif;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        z-index: 11000;
+        pointer-events: none;
+        white-space: nowrap;
+      }
       #hud {
         position: fixed;
         top: 20px;
@@ -498,6 +741,24 @@
         font-family: "MiSans Bold", MiSans, sans-serif;
         pointer-events: none;
         z-index: 9999;
+      }
+      #toast-hud {
+        position: fixed;
+        left: 50%;
+        bottom: 20px;
+        transform: translateX(-50%);
+        color: #4dcc4d;
+        font-size: 20px;
+        font-family: "MiSans Light", MiSans, sans-serif;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        opacity: 0;
+        transition: opacity 0.2s ease-out;
+        pointer-events: none;
+        z-index: 12000;
+      }
+      #toast-hud.show {
+        opacity: 1;
       }
       #cart-button {
         position: fixed;
@@ -604,61 +865,150 @@
       #summary-screen {
         position: fixed;
         inset: 0;
-        background: #ffffff;
-        color: #000000;
+        background: #dbe6dc;
+        color: #1f1f1a;
         display: none;
         z-index: 20000;
-        font-family: "MiSans Light", MiSans, sans-serif;
-        padding: 40px;
+        font-family: "Courier New", Courier, "Nimbus Mono PS", monospace;
+        padding: 42px 48px;
         box-sizing: border-box;
+        overflow-y: auto;
+      }
+      #summary-screen::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background:
+          linear-gradient(to bottom, rgba(0,0,0,0.08) 1px, transparent 1px),
+          linear-gradient(to right, rgba(0,0,0,0.06) 1px, transparent 1px);
+        background-size: 100% 26px, 26px 100%;
+        opacity: 0.55;
+        pointer-events: none;
+      }
+      #summary-screen::after {
+        content: "";
+        position: absolute;
+        inset: 16px;
+        border: 1px solid rgba(0,0,0,0.6);
+        opacity: 0.7;
+        pointer-events: none;
+      }
+      #summary-document {
+        position: relative;
+        z-index: 1;
+        max-width: 820px;
+        margin: 0 auto;
+      }
+      #summary-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 18px;
+      }
+      #summary-header h1 {
+        font-size: 16px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        margin: 0;
+      }
+      #summary-header .doc-seal {
+        border: 1px solid rgba(0,0,0,0.7);
+        border-radius: 2px;
+        padding: 4px 8px;
+        font-size: 10px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+      }
+      #summary-meta {
+        display: grid;
+        grid-template-columns: auto 1fr auto 1fr;
+        gap: 8px 12px;
+        align-items: end;
+        font-size: 12px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        margin-bottom: 18px;
+      }
+      #summary-meta span {
+        border-bottom: 1px solid rgba(0,0,0,0.7);
+        padding-bottom: 2px;
+        min-width: 140px;
       }
       #summary-content {
-        max-width: 700px;
-        margin: 0 auto 40px auto;
+        max-width: 760px;
+        margin: 0 auto 24px auto;
         white-space: pre-wrap;
-        font-size: 16px;
-        line-height: 1.6;
+        font-size: 13px;
+        line-height: 1.65;
         text-transform: uppercase;
       }
       #user-info {
-        max-width: 700px;
-        margin: 0 auto;
-        font-size: 14px;
+        max-width: 760px;
+        margin: 18px auto 0 auto;
+        font-size: 12px;
         text-transform: uppercase;
       }
-      #user-info .user-field {
-        display: flex;
-        align-items: center;
-        margin-bottom: 12px;
+      #user-info h2 {
+        margin: 0 0 10px 0;
+        font-size: 12px;
+        letter-spacing: 0.16em;
       }
-      #user-info label {
-        width: 140px;
+      #summary-breakdown {
+        margin: 18px 0 0 0;
+        font-size: 12px;
+        text-transform: uppercase;
+      }
+      #summary-breakdown h2 {
+        margin: 0 0 10px 0;
+        font-size: 12px;
+        letter-spacing: 0.16em;
+      }
+      #summary-breakdown-text {
+        white-space: pre-wrap;
+        font-size: 12px;
+        line-height: 1.6;
+      }
+      .user-table {
+        width: 100%;
+        border-collapse: collapse;
+        border: 1px solid rgba(0,0,0,0.7);
+      }
+      .user-table th,
+      .user-table td {
+        border: 1px solid rgba(0,0,0,0.5);
+        padding: 8px 10px;
+        text-align: left;
+        vertical-align: top;
+      }
+      .user-table th {
+        width: 180px;
         font-weight: 400;
-        letter-spacing: 0.05em;
+        letter-spacing: 0.08em;
+        background: rgba(0,0,0,0.05);
       }
-      #user-info input {
-        flex: 1;
+      .user-table input {
+        width: 100%;
         border: none;
-        border-bottom: 1px solid #000;
-        padding: 4px 2px;
-        font-family: "MiSans Light", MiSans, sans-serif;
-        font-size: 14px;
-        text-transform: none;
+        background: transparent;
+        font-family: "Courier New", Courier, "Nimbus Mono PS", monospace;
+        font-size: 12px;
+        text-transform: uppercase;
         outline: none;
       }
       #export-button {
         display: block;
-        margin: 40px auto 20px auto;
+        margin: 28px auto 12px auto;
         padding: 10px 26px;
-        font-size: 13px;
+        font-size: 12px;
         font-family: "MiSans Light", MiSans, sans-serif;
         text-transform: uppercase;
-        background: #3ba96b;
-        color: #ffffff;
-        border: none;
-        border-radius: 999px;
+        background: transparent;
+        color: #111111;
+        border: 1px solid #111111;
+        border-radius: 4px;
         cursor: pointer;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+        letter-spacing: 0.12em;
       }
       #export-button:hover {
         opacity: 0.9;
@@ -675,6 +1025,41 @@
     </style>
   </head>
   <body>
+    <div id="start-screen" class="screen">
+      <button id="enter-button">ENTER</button>
+    </div>
+    <div id="info-screen" class="screen hidden">
+      <form id="info-form">
+        <div class="info-field">
+          <label for="info-name">Name</label>
+          <input id="info-name" name="name" type="text" required />
+        </div>
+        <div class="info-field">
+          <label for="info-gender">Gender</label>
+          <select id="info-gender" name="gender" required>
+            <option value="" disabled selected>Select</option>
+            <option value="Female">Female</option>
+            <option value="Male">Male</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div class="info-field">
+          <label for="info-age">Age</label>
+          <input id="info-age" name="age" type="number" min="0" required />
+        </div>
+        <div class="info-field">
+          <label for="info-occupation">Occupation</label>
+          <input id="info-occupation" name="occupation" type="text" required />
+        </div>
+        <div class="info-field">
+          <label for="info-income">Income</label>
+          <input id="info-income" name="income" type="text" required />
+        </div>
+        <button id="continue-button" type="submit">Continue</button>
+      </form>
+    </div>
+    <div id="user-summary-top"></div>
+    <div id="toast-hud"></div>
     <div id="hud">$1000</div>
     <div id="cart-button">My Cart</div>
     <div id="cart-panel">
@@ -685,26 +1070,51 @@
     <div id="insufficient-popup"></div>
     <div id="done-button">DONE</div>
     <div id="summary-screen">
-      <div id="summary-content"></div>
-      <div id="user-info">
-        <div class="user-field">
-          <label for="first-name">NAME:</label>
-          <input id="first-name" type="text" />
+      <div id="summary-document">
+        <div id="summary-header">
+          <h1>Official Transaction Record</h1>
+          <div class="doc-seal">Authorized</div>
         </div>
-        <div class="user-field">
-          <label for="last-name">LAST NAME:</label>
-          <input id="last-name" type="text" />
+        <div id="summary-meta">
+          <div>Document No.</div>
+          <span id="summary-doc-id">AFR-2026</span>
+          <div>Date</div>
+          <span id="summary-date"></span>
         </div>
-        <div class="user-field">
-          <label for="age">AGE:</label>
-          <input id="age" type="text" />
+        <div id="summary-content"></div>
+        <div id="user-info">
+          <h2>Registrant Information</h2>
+          <table class="user-table">
+            <tbody>
+              <tr>
+                <th scope="row">Name</th>
+                <td><input id="summary-name" type="text" readonly /></td>
+              </tr>
+              <tr>
+                <th scope="row">Gender</th>
+                <td><input id="summary-gender" type="text" readonly /></td>
+              </tr>
+              <tr>
+                <th scope="row">Age</th>
+                <td><input id="summary-age" type="text" readonly /></td>
+              </tr>
+              <tr>
+                <th scope="row">Occupation</th>
+                <td><input id="summary-occupation" type="text" readonly /></td>
+              </tr>
+              <tr>
+                <th scope="row">Income</th>
+                <td><input id="summary-income" type="text" readonly /></td>
+              </tr>
+            </tbody>
+          </table>
         </div>
-        <div class="user-field">
-          <label for="occupation">OCCUPATION:</label>
-          <input id="occupation" type="text" />
+        <div id="summary-breakdown">
+          <h2>Assessment Summary</h2>
+          <div id="summary-breakdown-text"></div>
         </div>
+        <button id="export-button">EXPORT</button>
       </div>
-      <button id="export-button">EXPORT</button>
     </div>
     <a-scene>
       <!-- Assets -->
@@ -1224,6 +1634,7 @@
       <a-entity gltf-model="url(/window_blind02_-_2mb.glb)" position="-2.8 4.3 0.8" rotation="0 90 0" scale="1.6 1.6 1.6"></a-entity>
       <a-entity gltf-model="url(/long_table_and_chairs_low_poly.glb)" position="0 0 -4" rotation="0 180 0" scale="2 2 2"></a-entity>
       <a-entity gltf-model="url(/tablet_folder.glb)" position="0.5 1.45 -4" rotation="0 90 0" scale="0.02 0.02 0.02"></a-entity>
+      <a-entity gltf-model="url(/chmil_mannequin_bust_2024.glb)" face-camera force-model-color="color: #ffffff" position="-1.5 1.7 -4" rotation="0 360 0" scale="1.5 1.5 1.5"></a-entity>
 
       <!-- Money counter in 3D space (optional, if you want it in the scene) -->
       <a-text 

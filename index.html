@@ -365,13 +365,14 @@
 
       // Export summary screen as PDF
       async function exportSummaryAsPDF() {
-        const summaryScreen = document.getElementById('summary-screen');
-        if (!summaryScreen) return;
+        const summaryDocument = document.getElementById('summary-document');
+        if (!summaryDocument) return;
 
         // Use html2canvas to capture the summary area
-        const canvas = await html2canvas(summaryScreen, {
-          scale: 2,           // higher resolution
-          useCORS: true
+        const canvas = await html2canvas(summaryDocument, {
+          scale: 2,
+          useCORS: true,
+          backgroundColor: null
         });
         const imgData = canvas.toDataURL('image/png');
 

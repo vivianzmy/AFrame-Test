@@ -257,11 +257,7 @@
         const summaryScreen = document.getElementById('summary-screen');
         const summaryContent = document.getElementById('summary-content');
         const summaryDate = document.getElementById('summary-date');
-        const summaryPhysicalSpend = document.getElementById('summary-physical-spend');
-        const summarySkillSpend = document.getElementById('summary-skill-spend');
-        const summaryPhysicalShare = document.getElementById('summary-physical-share');
-        const summarySkillShare = document.getElementById('summary-skill-share');
-        const summaryPerfectionRating = document.getElementById('summary-perfection-rating');
+        const summaryBreakdownText = document.getElementById('summary-breakdown-text');
         if (!summaryScreen || !summaryContent) return;
 
         // Build summary text from cartItems (each item = $100)
@@ -329,17 +325,28 @@
         const ratingBase = Math.min(100, 50 + totalCount * 5);
         const perfectionRating = `${ratingBase}/100`;
 
+        const breakdownLines = [];
+        breakdownLines.push('CATEGORY BREAKDOWN');
+        breakdownLines.push(''.padEnd(42, '='));
+        breakdownLines.push(`PHYSICAL ALTERATIONS`.padEnd(30, '.') + ` $${physicalSpend}`);
+        breakdownLines.push(`SKILL ENHANCEMENTS`.padEnd(30, '.') + ` $${skillSpend}`);
+        breakdownLines.push('');
+        breakdownLines.push('TRANSACTION SHARE');
+        breakdownLines.push(''.padEnd(42, '-'));
+        breakdownLines.push(`PHYSICAL`.padEnd(30, '.') + ` ${physicalShare}%`);
+        breakdownLines.push(`SKILL`.padEnd(30, '.') + ` ${skillShare}%`);
+        breakdownLines.push('');
+        breakdownLines.push(`PERFECTION RATING`.padEnd(30, '.') + ` ${perfectionRating}`);
+
         // Prepare screen
         summaryScreen.style.display = 'block';
         summaryContent.textContent = '';
         if (summaryDate) {
           summaryDate.textContent = new Date().toLocaleDateString();
         }
-        if (summaryPhysicalSpend) summaryPhysicalSpend.textContent = `$${physicalSpend}`;
-        if (summarySkillSpend) summarySkillSpend.textContent = `$${skillSpend}`;
-        if (summaryPhysicalShare) summaryPhysicalShare.textContent = `${physicalShare}%`;
-        if (summarySkillShare) summarySkillShare.textContent = `${skillShare}%`;
-        if (summaryPerfectionRating) summaryPerfectionRating.textContent = perfectionRating;
+        if (summaryBreakdownText) {
+          summaryBreakdownText.textContent = breakdownLines.join('\n');
+        }
 
         // Typewriter effect
         let i = 0;

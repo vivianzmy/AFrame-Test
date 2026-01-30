@@ -417,6 +417,42 @@
       // ============================================
       // MENU CHOICE COMPONENT
       // ============================================
+      const facialFeatureConfigs = {
+        'Eye Color': {
+          multiple: [
+            { src: '/eyeball.glb', position: '-0.07 0.23 0.26', scale: '0.02 0.02 0.02' },
+            { src: '/eyeball.glb', position: '0.07 0.23 0.26', scale: '0.02 0.02 0.02' }
+          ]
+        },
+        'Brow Lift': { src: '/eyebrows.glb', position: '0 0.27 0.24', scale: '0.2 0.2 0.2' },
+        'Nose Job': { src: '/nose__blender_sculpt.glb', position: '0 0.12 0.28', scale: '0.03 0.03 0.03a' },
+        'Lip Shape': { src: '/speed_sculpt_lips.glb', position: '0 0.06 0.28', scale: '0.044 0.044 0.044' },
+        'Smile Brightening': { src: '/teeth.glb', position: '0 0.03 0.29', scale: '0.22 0.22 0.22' }
+      };
+
+      function showFacialFeature(itemName) {
+        const config = facialFeatureConfigs[itemName];
+        if (!config) return;
+        const mannequin = document.getElementById('mannequin');
+        if (!mannequin) return;
+
+        const multiple = config.multiple || [config];
+        multiple.forEach((featureConfig, index) => {
+          const featureId = `${itemName}-${index}`;
+          let feature = mannequin.querySelector(`[data-feature="${featureId}"]`);
+          if (!feature) {
+            feature = document.createElement('a-entity');
+            feature.setAttribute('gltf-model', `url(${featureConfig.src})`);
+            feature.setAttribute('position', featureConfig.position);
+            feature.setAttribute('scale', featureConfig.scale);
+            feature.setAttribute('rotation', featureConfig.rotation || '0 0 0');
+            feature.setAttribute('data-feature', featureId);
+            mannequin.appendChild(feature);
+          }
+          feature.setAttribute('visible', true);
+        });
+      }
+
       // This component handles clicks on menu items
       // It reads the itemName from the clicked entity's data attribute
       // The click detection uses mouse-based raycaster, so it targets the actual entity under the mouse cursor
@@ -464,6 +500,7 @@
               // Show toast notification with the exact item name from the clicked entity
               // The toast text is updated based on the clicked item's itemName property
               showToast(itemName);
+              showFacialFeature(itemName);
               // Add to cart
               addToCart(itemName);
               console.log(`Purchased: ${itemName} for $${cost}. Remaining: $${money}`);
@@ -1649,7 +1686,7 @@
       <a-entity gltf-model="url(/window_blind02_-_2mb.glb)" position="-2.8 4.3 0.8" rotation="0 90 0" scale="1.6 1.6 1.6"></a-entity>
       <a-entity gltf-model="url(/long_table_and_chairs_low_poly.glb)" position="0 0 -4" rotation="0 180 0" scale="2 2 2"></a-entity>
       <a-entity gltf-model="url(/tablet_folder.glb)" position="0.5 1.45 -4" rotation="0 90 0" scale="0.02 0.02 0.02"></a-entity>
-      <a-entity gltf-model="url(/chmil_mannequin_bust_2024.glb)" face-camera force-model-color="color: #ffffff" position="-1.5 1.7 -4" rotation="0 360 0" scale="1.5 1.5 1.5"></a-entity>
+      <a-entity id="mannequin" gltf-model="url(/chmil_mannequin_bust_2024.glb)" face-camera force-model-color="color: #ffffff" position="-1.5 1.7 -4" rotation="0 360 0" scale="1.5 1.5 1.5"></a-entity>
 
       <!-- Money counter in 3D space (optional, if you want it in the scene) -->
       <a-text 

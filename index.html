@@ -731,7 +731,9 @@
       document.addEventListener('DOMContentLoaded', () => {
         const startScreen = document.getElementById('start-screen');
         const infoScreen = document.getElementById('info-screen');
+        const noteScreen = document.getElementById('note-screen');
         const enterButton = document.getElementById('enter-button');
+        const startButton = document.getElementById('start-button');
         const infoForm = document.getElementById('info-form');
 
         const scene = document.querySelector('a-scene');
@@ -824,6 +826,15 @@
             }
 
             infoScreen.classList.add('hidden');
+            if (noteScreen) {
+              noteScreen.classList.remove('hidden');
+            }
+          });
+        }
+
+        if (startButton && noteScreen) {
+          startButton.addEventListener('click', () => {
+            noteScreen.classList.add('hidden');
             document.body.style.background = '';
             showApp();
           });
@@ -923,6 +934,36 @@
       #continue-button {
         margin-top: 12px;
         align-self: center;
+        padding: 10px 28px;
+        border: 1px solid #000000;
+        background: #000000;
+        color: #ffffff;
+        font-size: 14px;
+        text-transform: uppercase;
+        letter-spacing: 0.14em;
+        cursor: pointer;
+        font-family: "MiSans Light", MiSans, sans-serif;
+      }
+      #note-screen {
+        background: #ffffff;
+        color: #000000;
+      }
+      .sticky-note {
+        background: #fff6a8;
+        color: #222222;
+        padding: 24px 28px;
+        width: min(420px, 85vw);
+        min-height: 140px;
+        box-shadow: 0 8px 18px rgba(0,0,0,0.2);
+        border: 1px solid rgba(0,0,0,0.15);
+        transform: rotate(-1.5deg);
+        font-size: 14px;
+        line-height: 1.6;
+        letter-spacing: 0.04em;
+        text-transform: none;
+      }
+      #start-button {
+        margin-top: 24px;
         padding: 10px 28px;
         border: 1px solid #000000;
         background: #000000;
@@ -1351,6 +1392,12 @@
         </div>
         <button id="continue-button" type="submit">Continue</button>
       </form>
+    </div>
+    <div id="note-screen" class="screen hidden">
+      <div class="sticky-note">
+        You are entering an interview for your ideal role. Adjust your qualifications and appearance accordingly.
+      </div>
+      <button id="start-button" type="button">Start</button>
     </div>
     <div id="user-summary-top"></div>
     <div id="toast-hud"></div>

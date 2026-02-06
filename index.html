@@ -143,11 +143,16 @@
       // ============================================
       let money = 1000;
       const ITEM_COST = 100;
+      let currentUserId = '';
+      let currentQ1 = '';
+      let currentQ2 = '';
+      let currentQ3 = '';
 
       // ============================================
       // CART SYSTEM
       // ============================================
       let cartItems = [];
+      let purchasedItems = new Set();
 
       // Add item to cart
       function addToCart(itemName) {
@@ -257,7 +262,11 @@
         const summaryScreen = document.getElementById('summary-screen');
         const summaryContent = document.getElementById('summary-content');
         const summaryDate = document.getElementById('summary-date');
+        const summaryUserIdDisplay = document.getElementById('summary-user-id');
         const summaryBreakdownText = document.getElementById('summary-breakdown-text');
+        const summaryValuesText = document.getElementById('summary-values-text');
+        const valuesBarFill = document.getElementById('values-bar-fill');
+        const summaryBodyOverlay = document.getElementById('summary-body-overlay');
         if (!summaryScreen || !summaryContent) return;
 
         // Build summary text from cartItems (each item = $100)
@@ -344,8 +353,119 @@
         if (summaryDate) {
           summaryDate.textContent = new Date().toLocaleDateString();
         }
+        if (summaryUserIdDisplay) {
+          summaryUserIdDisplay.textContent = `USER ID: ${currentUserId || 'N/A'}`;
+        }
         if (summaryBreakdownText) {
           summaryBreakdownText.textContent = breakdownLines.join('\n');
+        }
+
+        const appearanceChoices = new Set(['How you present', 'Improve appearance']);
+        const skillChoices = new Set(['What you know', 'Practice answers', 'Research the company', 'Competence']);
+        const personalityChoices = new Set(['Confidence', 'Luck']);
+
+        const answers = [currentQ1, currentQ2, currentQ3].filter(Boolean);
+        let appearanceScore = 0;
+        let skillScore = 0;
+        let personalityScore = 0;
+
+        answers.forEach((answer) => {
+          if (appearanceChoices.has(answer)) appearanceScore += 1;
+          if (skillChoices.has(answer)) skillScore += 1;
+          if (personalityChoices.has(answer)) personalityScore += 1;
+        });
+
+        const skillsPersonalityScore = skillScore + personalityScore;
+        const totalScore = appearanceScore + skillsPersonalityScore;
+        const appearancePercent = totalScore ? Math.round((appearanceScore / totalScore) * 100) : 0;
+        const skillsPersonalityPercent = totalScore ? 100 - appearancePercent : 0;
+
+        const valuesLine = `User ${currentUserId || 'N/A'} values ` +
+          `${skillsPersonalityPercent}% skills/personality and ${appearancePercent}% appearance in life.`;
+
+        if (summaryValuesText) {
+          summaryValuesText.textContent = valuesLine;
+        }
+        if (valuesBarFill) {
+          valuesBarFill.style.width = `${appearancePercent}%`;
+        }
+
+        if (summaryBodyOverlay) {
+          const diagramPoints = {
+            'Eye Color': { x: 210, y: 5 },
+            'Eyelid Alteration': { x: 210, y: -12 },
+            'Brow Lift': { x: 210, y: -17 },
+            'Nose Job': { x: 210, y: 15 },
+            'Lip Shape': { x: 210, y: 24.5 },
+            'Cheekbone Alteration': { x: 206, y: 0.5 },
+            'Smile Brightening': { x: 210, y: 42.5 },
+            'Jawline Altercation': { x: 208, y: 32.5 },
+            'Face Lift': { x: 210, y: -25.5 },
+            'Skin Texture Smoothing': { x: 210, y: 74 },
+            'Shoulder Width': { x: 210, y: 56 },
+            'Breast Adjustments': { x: 210, y: 56 },
+            'Waist Sculpting': { x: 210, y: 88 },
+            'Ab Etching': { x: 210, y: 100 },
+            'Arm Slimming': { x: 82, y: 72 },
+            'Butt Implants': { x: 90, y: 112 },
+            'Height Extension': { x: 210, y: 136 }
+          };
+
+          const uniqueItems = Array.from(new Set(cartItems));
+          summaryBodyOverlay.innerHTML = '';
+
+          const ns = 'http://www.w3.org/2000/svg';
+          const defs = document.createElementNS(ns, 'defs');
+          const marker = document.createElementNS(ns, 'marker');
+          marker.setAttribute('id', 'arrowhead');
+          marker.setAttribute('markerWidth', '6');
+          marker.setAttribute('markerHeight', '6');
+          marker.setAttribute('refX', '5');
+          marker.setAttribute('refY', '3');
+          marker.setAttribute('orient', 'auto');
+          const arrow = document.createElementNS(ns, 'path');
+          arrow.setAttribute('d', 'M0,0 L6,3 L0,6 Z');
+          arrow.setAttribute('fill', '#2c2c2c');
+          marker.appendChild(arrow);
+          defs.appendChild(marker);
+          summaryBodyOverlay.appendChild(defs);
+
+          uniqueItems.forEach((item) => {
+            const point = diagramPoints[item];
+            if (!point) return;
+            const startX = point.x < 150 ? 20 : 280;
+            const startY = point.y;
+            const textX = point.x < 150 ? startX + 6 : startX - 6;
+            const textAnchor = point.x < 150 ? 'start' : 'end';
+
+            const line = document.createElementNS(ns, 'line');
+            line.setAttribute('x1', startX.toString());
+            line.setAttribute('y1', startY.toString());
+            line.setAttribute('x2', point.x.toString());
+            line.setAttribute('y2', point.y.toString());
+            line.setAttribute('stroke', '#2c2c2c');
+            line.setAttribute('stroke-width', '1');
+            line.setAttribute('marker-end', 'url(#arrowhead)');
+
+            const dot = document.createElementNS(ns, 'circle');
+            dot.setAttribute('cx', point.x.toString());
+            dot.setAttribute('cy', point.y.toString());
+            dot.setAttribute('r', '2');
+            dot.setAttribute('fill', '#2c2c2c');
+
+            const label = document.createElementNS(ns, 'text');
+            label.setAttribute('x', textX.toString());
+            label.setAttribute('y', (startY - 2).toString());
+            label.setAttribute('fill', '#2c2c2c');
+            label.setAttribute('font-size', '8');
+            label.setAttribute('letter-spacing', '0.08em');
+            label.setAttribute('text-anchor', textAnchor);
+            label.textContent = item.toUpperCase();
+
+            summaryBodyOverlay.appendChild(line);
+            summaryBodyOverlay.appendChild(dot);
+            summaryBodyOverlay.appendChild(label);
+          });
         }
 
         // Typewriter effect
@@ -496,7 +616,13 @@
             const cost = menuChoiceComponent.data.cost;
             
             // Deduct cost
+            if (purchasedItems.has(itemName)) {
+              console.log(`Already purchased: ${itemName}`);
+              return;
+            }
+
             if (deductCost(cost)) {
+              purchasedItems.add(itemName);
               // Show toast notification with the exact item name from the clicked entity
               // The toast text is updated based on the clicked item's itemName property
               showToast(itemName);
@@ -640,11 +766,22 @@
 
         hideApp();
 
+        const generateUserId = () => {
+          const part1 = Math.floor(100 + Math.random() * 900);
+          const part2 = Math.floor(10 + Math.random() * 90);
+          const part3 = Math.floor(1000 + Math.random() * 9000);
+          return `${part1}-${part2}-${part3}`;
+        };
+
         if (enterButton && startScreen && infoScreen) {
           enterButton.addEventListener('click', () => {
             startScreen.classList.add('hidden');
             infoScreen.classList.remove('hidden');
             document.body.style.background = '#ffffff';
+            const userIdInput = document.getElementById('info-user-id');
+            if (userIdInput && !userIdInput.value) {
+              userIdInput.value = generateUserId();
+            }
           });
         }
 
@@ -653,36 +790,37 @@
             event.preventDefault();
 
             const nameInput = document.getElementById('info-name');
-            const genderInput = document.getElementById('info-gender');
             const ageInput = document.getElementById('info-age');
-            const occupationInput = document.getElementById('info-occupation');
-            const incomeInput = document.getElementById('info-income');
+            const userIdInput = document.getElementById('info-user-id');
 
             const summaryName = document.getElementById('summary-name');
-            const summaryGender = document.getElementById('summary-gender');
             const summaryAge = document.getElementById('summary-age');
-            const summaryOccupation = document.getElementById('summary-occupation');
-            const summaryIncome = document.getElementById('summary-income');
+            const summaryQ1 = document.getElementById('summary-q1');
+            const summaryQ2 = document.getElementById('summary-q2');
+            const summaryQ3 = document.getElementById('summary-q3');
 
             const nameValue = nameInput ? nameInput.value.trim() : '';
-            const genderValue = genderInput ? genderInput.value.trim() : '';
             const ageValue = ageInput ? ageInput.value.trim() : '';
-            const occupationValue = occupationInput ? occupationInput.value.trim() : '';
-            const incomeValue = incomeInput ? incomeInput.value.trim() : '';
+            const userIdValue = userIdInput ? userIdInput.value.trim() : '';
+            const q1Value = infoForm.querySelector('input[name="q1"]:checked')?.value || '';
+            const q2Value = infoForm.querySelector('input[name="q2"]:checked')?.value || '';
+            const q3Value = infoForm.querySelector('input[name="q3"]:checked')?.value || '';
 
             if (summaryName) summaryName.value = nameValue;
-            if (summaryGender) summaryGender.value = genderValue;
             if (summaryAge) summaryAge.value = ageValue;
-            if (summaryOccupation) summaryOccupation.value = occupationValue;
-            if (summaryIncome) summaryIncome.value = incomeValue;
+            currentUserId = userIdValue;
+            currentQ1 = q1Value;
+            currentQ2 = q2Value;
+            currentQ3 = q3Value;
+            if (summaryQ1) summaryQ1.value = q1Value;
+            if (summaryQ2) summaryQ2.value = q2Value;
+            if (summaryQ3) summaryQ3.value = q3Value;
 
             if (userSummaryTop) {
               userSummaryTop.textContent =
                 `NAME: ${nameValue}  •  ` +
-                `GENDER: ${genderValue}  •  ` +
                 `AGE: ${ageValue}  •  ` +
-                `OCCUPATION: ${occupationValue}  •  ` +
-                `INCOME: ${incomeValue}`;
+                `ID: ${userIdValue}`;
             }
 
             infoScreen.classList.add('hidden');
@@ -741,6 +879,31 @@
         display: flex;
         flex-direction: column;
         gap: 6px;
+      }
+      .info-question {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        font-size: 12px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+      .info-options {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        font-size: 13px;
+        text-transform: none;
+      }
+      .info-options label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 14px;
+        text-transform: none;
+      }
+      .info-options input[type="radio"] {
+        accent-color: #000000;
       }
       .info-field label {
         font-size: 12px;
@@ -982,6 +1145,12 @@
         text-transform: uppercase;
         margin-bottom: 18px;
       }
+      #summary-user-id {
+        font-size: 12px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        margin: 6px 0 18px 0;
+      }
       #summary-meta span {
         border-bottom: 1px solid rgba(0,0,0,0.7);
         padding-bottom: 2px;
@@ -1020,6 +1189,69 @@
         white-space: pre-wrap;
         font-size: 12px;
         line-height: 1.6;
+      }
+      #summary-values {
+        margin: 18px 0 0 0;
+        font-size: 12px;
+        text-transform: uppercase;
+      }
+      #summary-values h2 {
+        margin: 0 0 10px 0;
+        font-size: 12px;
+        letter-spacing: 0.16em;
+      }
+      #summary-values-text {
+        white-space: pre-wrap;
+        font-size: 12px;
+        line-height: 1.6;
+        margin-bottom: 10px;
+      }
+      #summary-diagram {
+        margin: 18px 0 0 0;
+      }
+      #summary-diagram h2 {
+        margin: 0 0 10px 0;
+        font-size: 12px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+      }
+      .diagram-frame {
+        position: relative;
+        width: 100%;
+        max-width: 520px;
+        margin: 0 auto;
+        border: 1px solid rgba(0,0,0,0.6);
+        background: rgba(255,255,255,0.2);
+      }
+      .diagram-frame img {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+      .diagram-frame svg {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+      }
+      .values-bar {
+        position: relative;
+        height: 10px;
+        border: 1px solid rgba(0,0,0,0.7);
+        background: rgba(0,0,0,0.04);
+      }
+      .values-bar-fill {
+        height: 100%;
+        background: rgba(0,0,0,0.35);
+        width: 50%;
+      }
+      .values-bar-labels {
+        display: flex;
+        justify-content: space-between;
+        font-size: 10px;
+        letter-spacing: 0.12em;
+        margin-top: 6px;
       }
       .user-table {
         width: 100%;
@@ -1087,25 +1319,35 @@
           <input id="info-name" name="name" type="text" required />
         </div>
         <div class="info-field">
-          <label for="info-gender">Gender</label>
-          <select id="info-gender" name="gender" required>
-            <option value="" disabled selected>Select</option>
-            <option value="Female">Female</option>
-            <option value="Male">Male</option>
-            <option value="Other">Other</option>
-          </select>
-        </div>
-        <div class="info-field">
           <label for="info-age">Age</label>
           <input id="info-age" name="age" type="number" min="0" required />
         </div>
         <div class="info-field">
-          <label for="info-occupation">Occupation</label>
-          <input id="info-occupation" name="occupation" type="text" required />
+          <label for="info-user-id">User ID</label>
+          <input id="info-user-id" name="userId" type="text" readonly />
         </div>
-        <div class="info-field">
-          <label for="info-income">Income</label>
-          <input id="info-income" name="income" type="text" required />
+        <div class="info-question">
+          <div>In interviews, you rely more on:</div>
+          <div class="info-options">
+            <label><input type="radio" name="q1" value="How you present" required /> How you present</label>
+            <label><input type="radio" name="q1" value="What you know" required /> What you know</label>
+          </div>
+        </div>
+        <div class="info-question">
+          <div>If you had one hour before an interview:</div>
+          <div class="info-options">
+            <label><input type="radio" name="q2" value="Practice answers" required /> Practice answers</label>
+            <label><input type="radio" name="q2" value="Improve appearance" required /> Improve appearance</label>
+            <label><input type="radio" name="q2" value="Research the company" required /> Research the company</label>
+          </div>
+        </div>
+        <div class="info-question">
+          <div>You believe interviews reward:</div>
+          <div class="info-options">
+            <label><input type="radio" name="q3" value="Confidence" required /> Confidence</label>
+            <label><input type="radio" name="q3" value="Competence" required /> Competence</label>
+            <label><input type="radio" name="q3" value="Luck" required /> Luck</label>
+          </div>
         </div>
         <button id="continue-button" type="submit">Continue</button>
       </form>
@@ -1133,37 +1375,29 @@
           <div>Date</div>
           <span id="summary-date"></span>
         </div>
+        <div id="summary-user-id"></div>
         <div id="summary-content"></div>
-        <div id="user-info">
-          <h2>Registrant Information</h2>
-          <table class="user-table">
-            <tbody>
-              <tr>
-                <th scope="row">Name</th>
-                <td><input id="summary-name" type="text" readonly /></td>
-              </tr>
-              <tr>
-                <th scope="row">Gender</th>
-                <td><input id="summary-gender" type="text" readonly /></td>
-              </tr>
-              <tr>
-                <th scope="row">Age</th>
-                <td><input id="summary-age" type="text" readonly /></td>
-              </tr>
-              <tr>
-                <th scope="row">Occupation</th>
-                <td><input id="summary-occupation" type="text" readonly /></td>
-              </tr>
-              <tr>
-                <th scope="row">Income</th>
-                <td><input id="summary-income" type="text" readonly /></td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
         <div id="summary-breakdown">
           <h2>Assessment Summary</h2>
           <div id="summary-breakdown-text"></div>
+        </div>
+        <div id="summary-values">
+          <h2>Values Profile</h2>
+          <div id="summary-values-text"></div>
+          <div class="values-bar">
+            <div id="values-bar-fill" class="values-bar-fill"></div>
+          </div>
+          <div class="values-bar-labels">
+            <span>Skills/Personality</span>
+            <span>Appearance</span>
+          </div>
+        </div>
+        <div id="summary-diagram">
+          <h2>Upgrade Diagram</h2>
+          <div class="diagram-frame">
+            <img id="summary-body-img" src="/Autopsy.png" alt="Anatomical diagram" />
+            <svg id="summary-body-overlay" viewBox="0 0 300 220" preserveAspectRatio="xMidYMid meet"></svg>
+          </div>
         </div>
         <button id="export-button">EXPORT</button>
       </div>

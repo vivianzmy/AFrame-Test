@@ -486,15 +486,20 @@
       // Export summary screen as PDF
       async function exportSummaryAsPDF() {
         const summaryScreen = document.getElementById('summary-screen');
+        const exportButton = document.getElementById('export-button');
         if (!summaryScreen) return;
 
         const originalHeight = summaryScreen.style.height;
         const originalOverflow = summaryScreen.style.overflow;
         const originalScrollTop = summaryScreen.scrollTop;
+        const originalExportDisplay = exportButton ? exportButton.style.display : '';
 
         summaryScreen.style.height = `${summaryScreen.scrollHeight}px`;
         summaryScreen.style.overflow = 'visible';
         summaryScreen.scrollTop = 0;
+        if (exportButton) {
+          exportButton.style.display = 'none';
+        }
 
         // Use html2canvas to capture the full summary page (with grid/background)
         const canvas = await html2canvas(summaryScreen, {
@@ -506,6 +511,9 @@
         summaryScreen.style.height = originalHeight;
         summaryScreen.style.overflow = originalOverflow;
         summaryScreen.scrollTop = originalScrollTop;
+        if (exportButton) {
+          exportButton.style.display = originalExportDisplay;
+        }
         const imgData = canvas.toDataURL('image/png');
 
         const { jsPDF } = window.jspdf;
@@ -1197,9 +1205,16 @@
         padding-bottom: 2px;
         min-width: 140px;
       }
-      #summary-content {
-        max-width: 760px;
+      .summary-columns {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 24px;
+        align-items: start;
         margin: 0 auto 24px auto;
+        max-width: 760px;
+      }
+      #summary-content {
+        margin: 0;
         white-space: pre-wrap;
         font-size: 13px;
         line-height: 1.65;
@@ -1217,7 +1232,7 @@
         letter-spacing: 0.16em;
       }
       #summary-breakdown {
-        margin: 18px 0 0 0;
+        margin: 0;
         font-size: 12px;
         text-transform: uppercase;
       }
@@ -1423,10 +1438,12 @@
           <span id="summary-date"></span>
         </div>
         <div id="summary-user-id"></div>
-        <div id="summary-content"></div>
-        <div id="summary-breakdown">
-          <h2>Assessment Summary</h2>
-          <div id="summary-breakdown-text"></div>
+        <div class="summary-columns">
+          <div id="summary-content"></div>
+          <div id="summary-breakdown">
+            <h2>Assessment Summary</h2>
+            <div id="summary-breakdown-text"></div>
+          </div>
         </div>
         <div id="summary-values">
           <h2>Values Profile</h2>

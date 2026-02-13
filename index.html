@@ -139,6 +139,11 @@
       });
 
       // ============================================
+      // DEBUG MODE (set true for click/raycaster logs)
+      // ============================================
+      const DEBUG_CLICK = false;
+
+      // ============================================
       // MONEY MANAGEMENT SYSTEM
       // ============================================
       let money = 1000;
@@ -591,31 +596,26 @@
         },
         
         init: function() {
-          // Set starting opacity to 0 so colliders are invisible by default
-          this.el.setAttribute('material', 'opacity', 0);
+          // Set starting opacity to 0 so colliders are invisible by default (still clickable)
+          // Skip for entities with class "show-hitbox" (e.g. facial feature planes) so their red tint stays visible
+          if (!this.el.classList.contains('show-hitbox')) {
+            this.el.setAttribute('material', 'opacity', 0);
+          }
           
-          // DEBUG: Log collider position for alignment
-          console.log('menu-choice collider', this.data.itemName, this.el.getAttribute('position'));
+          if (typeof DEBUG_CLICK !== 'undefined' && DEBUG_CLICK) {
+            console.log('menu-choice collider', this.data.itemName, this.el.getAttribute('position'));
+          }
           
           // Click handler: reads itemName from the actual clicked entity
-          // HOW CLICK TARGET TEXT IS RETRIEVED:
-          // 1. The mouse-based raycaster (rayOrigin: mouse) ensures clicks happen where the mouse cursor is
-          // 2. When a menu item is clicked, the event fires on that specific entity (this.el)
-          // 3. We read the itemName from this.el.components['menu-choice'].data.itemName
-          // 4. This guarantees we get the exact text from the entity that was actually intersected by the mouse raycast
           this.handleClick = (evt) => {
-            // DEBUG: Log click event
-            console.log('CLICK', this.data.itemName, this.el.getAttribute('position'));
+            if (typeof DEBUG_CLICK !== 'undefined' && DEBUG_CLICK) {
+              console.log('Click received on menu item:', this.data.itemName, this.el.getAttribute('position'));
+            }
             
-            // Get the clicked entity - this.el is the entity that was actually intersected by the mouse raycaster
-            // The mouse raycaster (rayOrigin: mouse) ensures this is the entity under the mouse cursor, not the center reticle
             const clickedEntity = this.el;
-            
-            // Read itemName from the clicked entity's menu-choice component data
-            // This ensures we get the exact text from the entity that was clicked
             const menuChoiceComponent = clickedEntity.components['menu-choice'];
             if (!menuChoiceComponent) {
-              console.error('Menu choice component not found on clicked entity');
+              if (typeof DEBUG_CLICK !== 'undefined' && DEBUG_CLICK) console.error('Menu choice component not found on clicked entity');
               return;
             }
             
@@ -631,15 +631,12 @@
 
             if (deductCost(cost)) {
               purchasedItems.add(itemName);
-              // Show toast notification with the exact item name from the clicked entity
-              // The toast text is updated based on the clicked item's itemName property
               showToast(itemName);
               showFacialFeature(itemName);
-              // Add to cart
               addToCart(itemName);
-              console.log(`Purchased: ${itemName} for $${cost}. Remaining: $${money}`);
+              if (typeof DEBUG_CLICK !== 'undefined' && DEBUG_CLICK) console.log('Purchased:', itemName, 'Remaining:', money);
             } else {
-              console.log(`Insufficient funds! Need $${cost}, have $${money}`);
+              if (typeof DEBUG_CLICK !== 'undefined' && DEBUG_CLICK) console.log('Insufficient funds:', cost, money);
               showInsufficientBalance();
             }
           };
@@ -662,38 +659,141 @@
         }
       });
 
+      // ============================================
+      // FACE PICK ZONES (clickable 3D face mesh regions)
+      // Listens on #mouseCursor so GLTF submesh hits are handled reliably.
+      // ============================================
+      AFRAME.registerComponent('face-pick-zones', {
+        init: function() {
+          this.bboxLocal = null;
+          this.faceEl = this.el;
+          this.cursorEl = null;
+          this.handleModelLoaded = this.handleModelLoaded.bind(this);
+          this.handleCursorClick = this.handleCursorClick.bind(this);
+          this.el.addEventListener('model-loaded', this.handleModelLoaded);
+          var self = this;
+          this.attachToCursor = function() {
+            if (self.cursorEl) return;
+            var cursorEl = document.querySelector('#mouseCursor');
+            if (cursorEl) {
+              self.cursorEl = cursorEl;
+              cursorEl.addEventListener('click', self.handleCursorClick);
+            }
+          };
+          this.attachToCursor();
+          this.el.sceneEl.addEventListener('loaded', this.attachToCursor);
+        },
+        handleModelLoaded: function() {
+          var box = new THREE.Box3();
+          var self = this.el;
+          this.el.object3D.traverse(function(o) {
+            if (o.isMesh && o.geometry) {
+              var g = o.geometry;
+              if (!g.boundingBox) g.computeBoundingBox();
+              var b = g.boundingBox.clone();
+              b.applyMatrix4(o.matrixWorld);
+              b.applyMatrix4(self.object3D.matrixWorldInverse);
+              box.union(b);
+            }
+          });
+          this.bboxLocal = box;
+        },
+        getHitEntity: function(evt) {
+          var detail = evt.detail || {};
+          var el = detail.intersectedEl;
+          if (el) return el;
+          var inter = detail.intersection;
+          if (!inter || !inter.object) return null;
+          var obj = inter.object;
+          while (obj) {
+            if (obj.el) return obj.el;
+            obj = obj.parent;
+          }
+          return null;
+        },
+        isFaceOrDescendant: function(el) {
+          var node = el;
+          while (node) {
+            if (node === this.faceEl) return true;
+            node = node.parentEl || null;
+          }
+          return false;
+        },
+        classifyZone: function(nx, ny, nz) {
+          if (ny > 0.72 && nz > 0.52) return 'Brow Lift';
+          if (ny > 0.62 && nz > 0.55) return 'Eye Altercation';
+          if (ny > 0.45 && ny < 0.65 && nz > 0.60 && nx > 0.35 && nx < 0.65) return 'Nose Altercation';
+          if (ny > 0.30 && ny < 0.45 && nz > 0.58 && nx > 0.30 && nx < 0.70) return 'Lip Modification';
+          if (ny > 0.45 && ny < 0.65 && nz > 0.52 && (nx < 0.30 || nx > 0.70)) return 'Cheekbone Modification';
+          if (ny < 0.30 && nz > 0.48) return 'Jaw Altercation';
+          return null;
+        },
+        handleCursorClick: function(evt) {
+          var hitEl = this.getHitEntity(evt);
+          if (typeof DEBUG_CLICK !== 'undefined' && DEBUG_CLICK) {
+            console.log('Cursor click: hit entity', hitEl ? (hitEl.id || hitEl.tagName) : 'none');
+          }
+          if (!hitEl) return;
+          if (hitEl.components && hitEl.components['menu-choice']) return;
+          if (!this.isFaceOrDescendant(hitEl)) return;
+          var intersection = evt.detail && evt.detail.intersection;
+          if (!intersection || !intersection.point) return;
+          if (!this.bboxLocal) return;
+          var worldPoint = intersection.point.clone();
+          var entityLocal = worldPoint.applyMatrix4(this.faceEl.object3D.matrixWorldInverse);
+          var min = this.bboxLocal.min, max = this.bboxLocal.max;
+          var dx = max.x - min.x, dy = max.y - min.y, dz = max.z - min.z;
+          if (dx <= 0) dx = 1;
+          if (dy <= 0) dy = 1;
+          if (dz <= 0) dz = 1;
+          var nx = (entityLocal.x - min.x) / dx;
+          var ny = (entityLocal.y - min.y) / dy;
+          var nz = (entityLocal.z - min.z) / dz;
+          var label = this.classifyZone(nx, ny, nz);
+          if (typeof DEBUG_CLICK !== 'undefined' && DEBUG_CLICK) {
+            console.log('face-pick-zones nx=', nx.toFixed(3), 'ny=', ny.toFixed(3), 'nz=', nz.toFixed(3), 'label=', label || 'none');
+          }
+          if (!label) return;
+          showToast(label);
+        },
+        remove: function() {
+          this.el.removeEventListener('model-loaded', this.handleModelLoaded);
+          if (this.el.sceneEl) this.el.sceneEl.removeEventListener('loaded', this.attachToCursor);
+          if (this.cursorEl) this.cursorEl.removeEventListener('click', this.handleCursorClick);
+        }
+      });
+
       // Initialize money display and raycaster intersection logging when scene loads
       document.addEventListener('DOMContentLoaded', () => {
         const scene = document.querySelector('a-scene');
+        if (!scene) return;
         scene.addEventListener('loaded', () => {
+          if (DEBUG_CLICK) console.log('Scene loaded');
           updateMoneyDisplay();
           
-          // DEBUG: Listen to raycaster-intersection events to verify mouse-based raycasting
           const mouseCursorEl = document.querySelector('#mouseCursor');
           if (mouseCursorEl) {
-            mouseCursorEl.addEventListener('raycaster-intersection', (e) => {
-              const intersections = e.detail.intersections || [];
-              const itemNames = intersections
-                .map(i => {
-                  if (i.object && i.object.el) {
-                    const menuChoice = i.object.el.components['menu-choice'];
-                    if (menuChoice) {
-                      const pos = i.object.el.getAttribute('position');
-                      console.log('Hit collider:', menuChoice.data.itemName, 'at position:', pos);
-                      return menuChoice.data.itemName;
-                    }
+            if (DEBUG_CLICK) {
+              mouseCursorEl.addEventListener('raycaster-intersection', (e) => {
+                const intersections = e.detail.intersections || [];
+                const names = intersections.map(i => {
+                  var el = (i.object && i.object.el) ? i.object.el : null;
+                  if (!el) {
+                    var obj = i.object;
+                    while (obj && !obj.el) obj = obj.parent;
+                    el = obj && obj.el;
                   }
-                  return null;
-                })
-                .filter(name => name !== null);
-              console.log('Intersections from mouse:', itemNames);
-            });
-            
-            mouseCursorEl.addEventListener('raycaster-intersection-cleared', () => {
-              console.log('Mouse raycaster cleared (no intersections)');
-            });
-          } else {
-            console.error('mouseCursor element not found!');
+                  var id = el ? (el.id || '(no-id)') : '(no-el)';
+                  var cls = el ? (el.getAttribute('class') || '') : '';
+                  var menu = el && el.components && el.components['menu-choice'] ? el.components['menu-choice'].data.itemName : null;
+                  return menu || id + (cls ? ' .' + cls.replace(/\s+/g, '.') : '');
+                });
+                console.log('Raycaster intersections:', names);
+              });
+              mouseCursorEl.addEventListener('raycaster-intersection-cleared', () => {
+                console.log('Raycaster cleared');
+              });
+            }
           }
 
           // Cart button toggle logic
@@ -752,6 +852,7 @@
         const cartPanel = document.getElementById('cart-panel');
         const doneButton = document.getElementById('done-button');
         const insufficientPopup = document.getElementById('insufficient-popup');
+        const uploadScreen = document.getElementById('upload-screen') || null;
 
         const appElements = [scene, userSummaryTop, toastHud, hud, cartButton, cartPanel, doneButton, insufficientPopup];
 
@@ -1494,7 +1595,7 @@
         <a-entity
           id="mouseCursor"
           cursor="rayOrigin: mouse; fuse: false"
-          raycaster="objects: .menu-item-clickable; far: 50">
+          raycaster="objects: .menu-item-clickable, .clickable-face; far: 50">
         </a-entity>
       </a-camera>
       <a-entity gltf-model="url(/potted_plant_mediterranean_med_leaf_low_poly.glb)" position="-4 0 -8.5"  scale="2 2 2"></a-entity>
@@ -1623,7 +1724,10 @@
             scale="3.5 3.5 3.5">
           </a-entity>
           <a-entity
+            id="femaleFace"
+            class="clickable-face"
             gltf-model="url(/Female face.glb)"
+            face-pick-zones
             position="-0.8 -3.9 0.2"
             rotation="0 0 0"
             scale="15 15 15">
@@ -1634,102 +1738,102 @@
           
           <!-- Top row left: Eyeballs → Eye Color -->
           <a-plane 
-            class="menu-item-clickable"
+            class="menu-item-clickable show-hitbox"
             menu-choice="itemName: Eye Color; cost: 100"
-            position="-1.2 -3.2 0.8"
+            position="-1.2 1.8 0.8"
             width="1.4"
             height="0.9"
-            material="color: #00ff00; transparent: true; opacity: 0; side: double">
+            material="color: #ff0000; transparent: true; opacity: 0.35; side: double">
           </a-plane>
           
           <!-- Top row middle: Eyelid → Eyelid Alteration -->
           <a-plane 
-            class="menu-item-clickable"
+            class="menu-item-clickable show-hitbox"
             menu-choice="itemName: Eyelid Alteration; cost: 100"
-            position="-0.8 -3.2 0.8"
+            position="-0.8 1.8 0.8"
             width="1.4"
             height="0.9"
-            material="color: #00ff00; transparent: true; opacity: 0; side: double">
+            material="color: #ff0000; transparent: true; opacity: 0.35; side: double">
           </a-plane>
           
           <!-- Top row right: Brows → Brow Lift -->
           <a-plane 
-            class="menu-item-clickable"
+            class="menu-item-clickable show-hitbox"
             menu-choice="itemName: Brow Lift; cost: 100"
-            position="-0.4 -3.15 0.8"
+            position="-0.4 1.85 0.8"
             width="1.4"
             height="0.9"
-            material="color: #00ff00; transparent: true; opacity: 0; side: double">
+            material="color: #ff0000; transparent: true; opacity: 0.35; side: double">
           </a-plane>
           
           <!-- Middle row left: Nose → Nose Job -->
           <a-plane 
-            class="menu-item-clickable"
+            class="menu-item-clickable show-hitbox"
             menu-choice="itemName: Nose Job; cost: 100"
-            position="-0.8 -3.6 0.8"
+            position="-0.8 1.4 0.8"
             width="1.0"
             height="1.0"
-            material="color: #00ff00; transparent: true; opacity: 0; side: double">
+            material="color: #ff0000; transparent: true; opacity: 0.35; side: double">
           </a-plane>
           
           <!-- Middle row middle: Lips → Lip Shape -->
           <a-plane 
-            class="menu-item-clickable"
+            class="menu-item-clickable show-hitbox"
             menu-choice="itemName: Lip Shape; cost: 100"
-            position="-0.8 -3.9 0.8"
+            position="-0.8 1.1 0.8"
             width="1.2"
             height="0.8"
-            material="color: #00ff00; transparent: true; opacity: 0; side: double">
+            material="color: #ff0000; transparent: true; opacity: 0.35; side: double">
           </a-plane>
           
           <!-- Middle row right: Cheekbone → Cheekbone Alteration -->
           <a-plane 
-            class="menu-item-clickable"
+            class="menu-item-clickable show-hitbox"
             menu-choice="itemName: Cheekbone Alteration; cost: 100"
-            position="-0.2 -3.55 0.8"
+            position="-0.2 1.45 0.8"
             width="1.1"
             height="0.9"
-            material="color: #00ff00; transparent: true; opacity: 0; side: double">
+            material="color: #ff0000; transparent: true; opacity: 0.35; side: double">
           </a-plane>
           
           <!-- Jawbone → Smile Brightening (position to be adjusted) -->
           <a-plane 
-            class="menu-item-clickable"
+            class="menu-item-clickable show-hitbox"
             menu-choice="itemName: Smile Brightening; cost: 100"
-            position="-0.8 -4.1 0.8"
+            position="-0.8 0.9 0.8"
             width="1.2"
             height="0.8"
-            material="color: #00ff00; transparent: true; opacity: 0; side: double">
+            material="color: #ff0000; transparent: true; opacity: 0.35; side: double">
           </a-plane>
           
           <!-- Bottom row left: Skin patch → Skin Texture Smoothing -->
           <a-plane 
-            class="menu-item-clickable"
+            class="menu-item-clickable show-hitbox"
             menu-choice="itemName: Skin Texture Smoothing; cost: 100"
-            position="-1.2 -3.9 0.8"
+            position="-1.2 1.1 0.8"
             width="1.4"
             height="1.6"
-            material="color: #00ff00; transparent: true; opacity: 0; side: double">
+            material="color: #ff0000; transparent: true; opacity: 0.35; side: double">
           </a-plane>
           
           <!-- Bottom row middle: Teeth → Jawline Altercation -->
           <a-plane 
-            class="menu-item-clickable"
+            class="menu-item-clickable show-hitbox"
             menu-choice="itemName: Jawline Altercation; cost: 100"
-            position="-0.8 -4.3 0.8"
-            width="1.4"
-            height="1.1"
-            material="color: #00ff00; transparent: true; opacity: 0; side: double">
+            position="-0.8 -1 1.3"
+            width="1.1"
+            height="1"
+            material="color: #ff0000; transparent: true; opacity: 0.35; side: double">
           </a-plane>
           
           <!-- Right side: Full face → Face Lift -->
           <a-plane 
-            class="menu-item-clickable"
+            class="menu-item-clickable show-hitbox"
             menu-choice="itemName: Face Lift; cost: 100"
-            position="-0.8 -3.7 0.8"
-            width="2.6"
-            height="3.4"
-            material="color: #00ff00; transparent: true; opacity: 0; side: double">
+            position="0 1 1.4"
+            width="2"
+            height="1"
+            material="color: #ff0000; transparent: true; opacity: 0.35; side: double">
           </a-plane>
         </a-entity>
 

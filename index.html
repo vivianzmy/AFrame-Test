@@ -887,8 +887,6 @@
 
         hideApp();
 
-        showApp();
-
         const generateUserId = () => {
           const part1 = Math.floor(100 + Math.random() * 900);
           const part2 = Math.floor(10 + Math.random() * 90);
@@ -1069,19 +1067,14 @@
         background: #ffffff;
         color: #000000;
       }
-      .sticky-note {
-        background: #fff6a8;
-        color: #222222;
-        padding: 24px 28px;
-        width: min(420px, 85vw);
-        min-height: 140px;
-        box-shadow: 0 8px 18px rgba(0,0,0,0.2);
-        border: 1px solid rgba(0,0,0,0.15);
-        transform: rotate(-1.5deg);
+      .note-text {
+        margin: 0 auto 24px;
+        max-width: 480px;
         font-size: 14px;
         line-height: 1.6;
         letter-spacing: 0.04em;
-        text-transform: none;
+        font-family: "MiSans Light", MiSans, sans-serif;
+        text-align: center;
       }
       #start-button {
         margin-top: 24px;
@@ -1538,9 +1531,7 @@
       </form>
     </div>
     <div id="note-screen" class="screen hidden">
-      <div class="sticky-note">
-        You are entering an interview for your ideal role. Adjust your qualifications and appearance accordingly.
-      </div>
+      <p class="note-text">You are entering an interview for your ideal role. Adjust your qualifications and appearance accordingly.</p>
       <button id="start-button" type="button">Start</button>
     </div>
     <div id="user-summary-top"></div>

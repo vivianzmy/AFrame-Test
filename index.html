@@ -592,21 +592,18 @@
       AFRAME.registerComponent('menu-choice', {
         schema: {
           itemName: { type: 'string', default: 'Item' },
-          cost: { type: 'number', default: 100 }
+          cost: { type: 'number', default: 100 },
+          showHoverLabel: { type: 'boolean', default: false }
         },
         
         init: function() {
-          // Set starting opacity to 0 so colliders are invisible by default (still clickable)
-          // Skip for entities with class "show-hitbox" (e.g. facial feature planes) so their red tint stays visible
-          if (!this.el.classList.contains('show-hitbox')) {
-            this.el.setAttribute('material', 'opacity', 0);
-          }
+          // All colliders invisible but still clickable
+          this.el.setAttribute('material', 'opacity', 0);
           
           if (typeof DEBUG_CLICK !== 'undefined' && DEBUG_CLICK) {
             console.log('menu-choice collider', this.data.itemName, this.el.getAttribute('position'));
           }
           
-          // Click handler: reads itemName from the actual clicked entity
           this.handleClick = (evt) => {
             if (typeof DEBUG_CLICK !== 'undefined' && DEBUG_CLICK) {
               console.log('Click received on menu item:', this.data.itemName, this.el.getAttribute('position'));
@@ -641,21 +638,31 @@
             }
           };
           
-          // Attach click listener to this specific menu item entity
-          // The mouse raycaster will only trigger this if the mouse cursor is over this entity
           this.el.addEventListener('click', this.handleClick);
           
-          // Hover feedback disabled - hitboxes remain invisible at all times
-          // this.el.addEventListener('mouseenter', () => {
-          //   this.el.setAttribute('material', 'opacity', 0.12);
-          // });
-          // this.el.addEventListener('mouseleave', () => {
-          //   this.el.setAttribute('material', 'opacity', 0);
-          // });
+          if (this.data.showHoverLabel) {
+            this.showHover = function() {
+              var tip = document.getElementById('face-hover-tooltip');
+              if (tip) {
+                tip.textContent = this.data.itemName;
+                tip.classList.add('show');
+              }
+            }.bind(this);
+            this.hideHover = function() {
+              var tip = document.getElementById('face-hover-tooltip');
+              if (tip) tip.classList.remove('show');
+            };
+            this.el.addEventListener('mouseenter', this.showHover);
+            this.el.addEventListener('mouseleave', this.hideHover);
+          }
         },
         
         remove: function() {
           this.el.removeEventListener('click', this.handleClick);
+          if (this.data.showHoverLabel) {
+            this.el.removeEventListener('mouseenter', this.showHover);
+            this.el.removeEventListener('mouseleave', this.hideHover);
+          }
         }
       });
 
@@ -1135,6 +1142,22 @@
       #toast-hud.show {
         opacity: 1;
       }
+      #face-hover-tooltip {
+        position: fixed;
+        right: 250px;
+        bottom: 300px;
+        color: #22aa22;
+        font-size: 20px;
+        font-family: "MiSans Regular", MiSans, sans-serif;
+        letter-spacing: 0.04em;
+        opacity: 0;
+        pointer-events: none;
+        z-index: 11000;
+        transition: opacity 0.15s ease-out;
+      }
+      #face-hover-tooltip.show {
+        opacity: 1;
+      }
       #cart-button {
         position: fixed;
         left: 20px;
@@ -1522,6 +1545,7 @@
     </div>
     <div id="user-summary-top"></div>
     <div id="toast-hud"></div>
+    <div id="face-hover-tooltip"></div>
     <div id="hud">$1000</div>
     <div id="cart-button">My Cart</div>
     <div id="cart-panel">
@@ -1738,82 +1762,82 @@
           
           <!-- Top row left: Eyeballs → Eye Color -->
           <a-plane 
-            class="menu-item-clickable show-hitbox"
-            menu-choice="itemName: Eye Color; cost: 100"
+            class="menu-item-clickable"
+            menu-choice="itemName: Eye Color; cost: 100; showHoverLabel: true"
             position="-0.6 0 1.5"
             width="0.5"
             height="0.3"
-            material="color: #ff0000; transparent: true; opacity: 0.35; side: double">
+            material="color: #000000; transparent: true; opacity: 0; side: double">
           </a-plane>
           
           <!-- Top row middle: Eyelid → Eyelid Alteration -->
           <a-plane 
-            class="menu-item-clickable show-hitbox"
-            menu-choice="itemName: Eyelid Alteration; cost: 100"
+            class="menu-item-clickable"
+            menu-choice="itemName: Eyelid Alteration; cost: 100; showHoverLabel: true"
             position="0.6 0 1.5"
             width="0.5"
             height="0.3"
-            material="color: #ff0000; transparent: true; opacity: 0.35; side: double">
+            material="color: #000000; transparent: true; opacity: 0; side: double">
           </a-plane>
           
           <!-- Top row right: Brows → Brow Lift -->
           <a-plane 
-            class="menu-item-clickable show-hitbox"
-            menu-choice="itemName: Brow Lift; cost: 100"
+            class="menu-item-clickable"
+            menu-choice="itemName: Brow Lift; cost: 100; showHoverLabel: true"
             position="0 0.4 1.55"
             width="1.9"
             height="0.2"
-            material="color: #ff0000; transparent: true; opacity: 0.35; side: double">
+            material="color: #000000; transparent: true; opacity: 0; side: double">
           </a-plane>
           
           <!-- Middle row left: Nose → Nose Job -->
           <a-plane 
-            class="menu-item-clickable show-hitbox"
-            menu-choice="itemName: Nose Job; cost: 100"
+            class="menu-item-clickable"
+            menu-choice="itemName: Nose Job; cost: 100; showHoverLabel: true"
             position="0.08 -0.3 1.8"
             width="0.5"
             height="1.0"
-            material="color: #ff0000; transparent: true; opacity: 0.35; side: double">
+            material="color: #000000; transparent: true; opacity: 0; side: double">
           </a-plane>
           
           <!-- Middle row middle: Lips → Lip Shape -->
           <a-plane 
-            class="menu-item-clickable show-hitbox"
-            menu-choice="itemName: Lip Shape; cost: 100"
+            class="menu-item-clickable"
+            menu-choice="itemName: Lip Shape; cost: 100; showHoverLabel: true"
             position="0.06 -1.09 1.6"
             width="0.9"
             height="0.45"
-            material="color: #ff0000; transparent: true; opacity: 0.35; side: double">
+            material="color: #000000; transparent: true; opacity: 0; side: double">
           </a-plane>
           
           <!-- Middle row right: Cheekbone → Cheekbone Alteration -->
           <a-plane 
-            class="menu-item-clickable show-hitbox"
-            menu-choice="itemName: Cheekbone Alteration; cost: 100"
+            class="menu-item-clickable"
+            menu-choice="itemName: Cheekbone Alteration; cost: 100; showHoverLabel: true"
             position="0.8 -0.55 1.25"
             width="0.7"
             height="0.5"
-            material="color: #ff0000; transparent: true; opacity: 0.35; side: double">
+            material="color: #000000; transparent: true; opacity: 0; side: double">
           </a-plane>
           
           <!-- Jawbone → Smile Brightening (position to be adjusted) -->
           <a-plane 
-            class="menu-item-clickable show-hitbox"
-            menu-choice="itemName: Smile Brightening; cost: 100"
+            class="menu-item-clickable"
+            menu-choice="itemName: Smile Brightening; cost: 100; showHoverLabel: true"
             position="0.08 -1.09 1.7"
             width="0.7"
             height="0.1"
-            material="color: #ff0000; transparent: true; opacity: 0.35; side: double">
+            material="color: #000000; transparent: true; opacity: 0; side: double">
           </a-plane>
           
           <!-- Bottom row left: Skin patch → Skin Texture Smoothing -->
           <a-plane 
-            class="menu-item-clickable show-hitbox"
-            menu-choice="itemName: Skin Texture Smoothing; cost: 100"
+            class="menu-item-clickable"
+            menu-choice="itemName: Skin Texture Smoothing; cost: 100; showHoverLabel: true"
             position="-0.4 -0.6 1.4"
             width="0.8"
             height="0.8"
-            material="color: #ff0000; transparent: true; opacity: 0.35; side: double">
+            material="color: #000000; transparent: true; opacity: 0; side: double">
           </a-plane>
           
           <!-- Bottom row middle: Teeth → Jawline Altercation -->
@@ -1828,12 +1852,12 @@
           
           <!-- Right side: Full face → Face Lift -->
           <a-plane 
-            class="menu-item-clickable show-hitbox"
-            menu-choice="itemName: Face Lift; cost: 100"
+            class="menu-item-clickable"
+            menu-choice="itemName: Face Lift; cost: 100; showHoverLabel: true"
             position="0 1 1.4"
             width="2"
             height="1"
-            material="color: #ff0000; transparent: true; opacity: 0.35; side: double">
+            material="color: #000000; transparent: true; opacity: 0; side: double">
           </a-plane>
         </a-entity>
 

@@ -1476,13 +1476,17 @@
         opacity: 0.9;
       }
       .a-enter-vr, 
-      .a-enter-ar, 
-      .a-enter-fullscreen {
+      .a-enter-ar {
         bottom: auto !important;
         right: auto !important;
         top: 50px !important;
         left: -1360px !important;
         z-index: 99999 !important;
+      }
+      .a-enter-fullscreen {
+        display: none !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
       }
     </style>
   </head>

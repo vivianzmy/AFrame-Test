@@ -12,22 +12,20 @@
       // FACE CAMERA COMPONENT
       // ============================================
       AFRAME.registerComponent('face-camera', {
-        tick: function() {
-          const camera = document.querySelector('#camera');
-          if (camera) {
-            const cameraPos = camera.getAttribute('position');
-            const elPos = this.el.getAttribute('position');
-            
-            const dx = cameraPos.x - elPos.x;
-            const dy = cameraPos.y - elPos.y;
-            const dz = cameraPos.z - elPos.z;
-            
-            const yAngle = Math.atan2(dx, dz) * (180 / Math.PI);
-            const distance = Math.sqrt(dx * dx + dz * dz);
-            const xAngle = -Math.atan2(dy, distance) * (180 / Math.PI);
-            
-            this.el.setAttribute('rotation', `${xAngle} ${yAngle} 0`);
-          }
+        init: function () {
+          this.cameraEl = document.querySelector('#camera');
+        },
+        tick: function () {
+          if (!this.cameraEl || !this.el.isPlaying) return;
+          var cameraPos = this.cameraEl.getAttribute('position');
+          var elPos = this.el.getAttribute('position');
+          var dx = cameraPos.x - elPos.x;
+          var dy = cameraPos.y - elPos.y;
+          var dz = cameraPos.z - elPos.z;
+          var yAngle = Math.atan2(dx, dz) * (180 / Math.PI);
+          var distance = Math.sqrt(dx * dx + dz * dz);
+          var xAngle = -Math.atan2(dy, distance) * (180 / Math.PI);
+          this.el.setAttribute('rotation', xAngle + ' ' + yAngle + ' 0');
         }
       });
 
@@ -35,24 +33,19 @@
       // PNG TRANSPARENCY FIX COMPONENT
       // ============================================
       AFRAME.registerComponent('fix-png-transparency', {
-        init: function() {
+        init: function () {
           this.applyFix = this.applyFix.bind(this);
-          
-          // Try to apply fix immediately
+          this.textureFixed = false;
+          this.tickCount = 0;
           this.applyFix();
-          
-          // Also try after model loads
           this.el.addEventListener('loaded', this.applyFix);
           this.el.addEventListener('model-loaded', this.applyFix);
-          
-          // Use tick to check when texture becomes available
-          this.textureFixed = false;
         },
-        
-        tick: function() {
-          if (!this.textureFixed) {
-            this.applyFix();
-          }
+        tick: function () {
+          if (this.textureFixed) return;
+          this.tickCount++;
+          if (this.tickCount > 120) { this.textureFixed = true; return; }
+          this.applyFix();
         },
         
         applyFix: function() {
@@ -142,6 +135,8 @@
       // DEBUG MODE (set true for click/raycaster logs)
       // ============================================
       const DEBUG_CLICK = false;
+      // Quest debugging: set true to show fps + last error overlay
+      const DEBUG_XR = false;
 
       // ============================================
       // MONEY MANAGEMENT SYSTEM
@@ -634,21 +629,25 @@
       // Listens on #mouseCursor so GLTF submesh hits are handled reliably.
       // ============================================
       AFRAME.registerComponent('face-pick-zones', {
-        init: function() {
+        init: function () {
           this.bboxLocal = null;
           this.faceEl = this.el;
-          this.cursorEl = null;
+          this.clickTargets = [];
           this.handleModelLoaded = this.handleModelLoaded.bind(this);
           this.handleCursorClick = this.handleCursorClick.bind(this);
           this.el.addEventListener('model-loaded', this.handleModelLoaded);
           var self = this;
-          this.attachToCursor = function() {
-            if (self.cursorEl) return;
-            var cursorEl = document.querySelector('#mouseCursor');
-            if (cursorEl) {
-              self.cursorEl = cursorEl;
-              cursorEl.addEventListener('click', self.handleCursorClick);
-            }
+          this.attachToCursor = function () {
+            var mouseCursor = document.querySelector('#mouseCursor');
+            var left = document.querySelector('#vrControllerLeft');
+            var right = document.querySelector('#vrControllerRight');
+            [mouseCursor, left, right].forEach(function (el) {
+              if (el && el.getAttribute('data-face-pick-attached') !== 'true') {
+                el.setAttribute('data-face-pick-attached', 'true');
+                el.addEventListener('click', self.handleCursorClick);
+                self.clickTargets.push(el);
+              }
+            });
           };
           this.attachToCursor();
           this.el.sceneEl.addEventListener('loaded', this.attachToCursor);
@@ -726,10 +725,38 @@
           if (!label) return;
           showToast(label);
         },
-        remove: function() {
+        remove: function () {
           this.el.removeEventListener('model-loaded', this.handleModelLoaded);
           if (this.el.sceneEl) this.el.sceneEl.removeEventListener('loaded', this.attachToCursor);
-          if (this.cursorEl) this.cursorEl.removeEventListener('click', this.handleCursorClick);
+          this.clickTargets.forEach(function (el) {
+            el.removeEventListener('click', this.handleCursorClick);
+          }.bind(this));
+        }
+      });
+
+      // ============================================
+      // DONE VR BUTTON (in-world, shown only in VR)
+      // ============================================
+      AFRAME.registerComponent('done-vr-button', {
+        init: function () {
+          this.onClick = this.onClick.bind(this);
+          this.el.addEventListener('click', this.onClick);
+        },
+        onClick: function () {
+          var scene = document.querySelector('a-scene');
+          var hud = document.getElementById('hud');
+          var cartButton = document.getElementById('cart-button');
+          var cartPanel = document.getElementById('cart-panel');
+          var insufficientPopup = document.getElementById('insufficient-popup');
+          if (scene) scene.style.display = 'none';
+          if (hud) hud.style.display = 'none';
+          if (cartButton) cartButton.style.display = 'none';
+          if (cartPanel) cartPanel.style.display = 'none';
+          if (insufficientPopup) insufficientPopup.style.display = 'none';
+          if (typeof showSummaryScreen === 'function') showSummaryScreen();
+        },
+        remove: function () {
+          this.el.removeEventListener('click', this.onClick);
         }
       });
 
@@ -800,9 +827,31 @@
           const exportButton = document.getElementById('export-button');
           if (exportButton) {
             exportButton.addEventListener('click', () => {
+              if (scene.is && scene.is('vr-mode')) {
+                if (typeof showToast === 'function') showToast('Export not supported in headset');
+                return;
+              }
               exportSummaryAsPDF();
             });
           }
+
+          // VR enter/exit: hide DOM overlays in VR, show in-world DONE
+          var doneVrEl = document.getElementById('done-vr-button');
+          var overlayIds = ['start-screen', 'info-screen', 'note-screen', 'user-summary-top', 'toast-hud', 'face-hover-tooltip', 'hud', 'cart-button', 'cart-panel', 'done-button', 'insufficient-popup'];
+          scene.addEventListener('enter-vr', function () {
+            overlayIds.forEach(function (id) {
+              var el = document.getElementById(id);
+              if (el) el.style.display = 'none';
+            });
+            if (doneVrEl) doneVrEl.setAttribute('visible', true);
+          });
+          scene.addEventListener('exit-vr', function () {
+            overlayIds.forEach(function (id) {
+              var el = document.getElementById(id);
+              if (el) el.style.display = '';
+            });
+            if (doneVrEl) doneVrEl.setAttribute('visible', false);
+          });
         });
       });
 
@@ -1438,19 +1487,6 @@
       #export-button:hover {
         opacity: 0.9;
       }
-      .a-enter-vr, 
-      .a-enter-ar {
-        bottom: auto !important;
-        right: auto !important;
-        top: 50px !important;
-        left: -1360px !important;
-        z-index: 99999 !important;
-      }
-      .a-enter-fullscreen {
-        display: none !important;
-        visibility: hidden !important;
-        pointer-events: none !important;
-      }
     </style>
   </head>
   <body>
@@ -1554,30 +1590,38 @@
         <button id="export-button">EXPORT</button>
       </div>
     </div>
-    <a-scene>
+    <a-scene
+      vr-mode-ui="enabled: false"
+      renderer="colorManagement: true; physicallyCorrectLights: false; antialias: false; shadow: false; powerPreference: high-performance">
       <!-- Assets -->
       <a-assets>
         <!-- Mixamo sitting idle character -->
         <a-asset-item id="sittingModel" src="/Sitting Idle (3).glb"></a-asset-item>
       </a-assets>
-      <!-- Camera with mouse-based raycaster for desktop interaction -->
-      <!-- 
-        MOUSE RAYCASTER SETUP:
-        - Dedicated mouseCursor entity inside camera owns cursor + raycaster components
-        - cursor="rayOrigin: mouse" makes clicks based on mouse position (not center reticle)
-        - raycaster="objects: .menu-item-clickable" only targets menu items
-        - No visual cursor ring - this is a desktop mouse experience
-        - Click events are triggered automatically by the mouse raycaster
-      -->
-      <a-camera 
-        id="camera" 
-        position="0 2.2 -2.5" 
+
+      <!-- VR controller rays (Quest): same targets as desktop; click fires on intersected entity -->
+      <a-entity
+        id="vrControllerLeft"
+        laser-controls="hand: left"
+        cursor="fuse: false"
+        raycaster="objects: .menu-item-clickable, .clickable-face, .done-vr-clickable; far: 50">
+      </a-entity>
+      <a-entity
+        id="vrControllerRight"
+        laser-controls="hand: right"
+        cursor="fuse: false"
+        raycaster="objects: .menu-item-clickable, .clickable-face, .done-vr-clickable; far: 50">
+      </a-entity>
+
+      <!-- Camera with desktop mouse raycaster -->
+      <a-camera
+        id="camera"
+        position="0 2.2 -2.5"
         look-controls="enabled: true">
-        <!-- Dedicated mouse cursor entity - invisible, handles mouse-based raycasting -->
         <a-entity
           id="mouseCursor"
           cursor="rayOrigin: mouse; fuse: false"
-          raycaster="objects: .menu-item-clickable, .clickable-face; far: 50">
+          raycaster="objects: .menu-item-clickable, .clickable-face, .done-vr-clickable; far: 50">
         </a-entity>
       </a-camera>
       <a-entity gltf-model="url(/potted_plant_mediterranean_med_leaf_low_poly.glb)" position="-4 0 -8.5"  scale="2 2 2"></a-entity>
@@ -2116,9 +2160,71 @@
                color="#7BC8A4">
       </a-plane>
       <a-sky color="#ECECEC"></a-sky>
+
+      <!-- In-world DONE button (visible only in VR) -->
+      <a-entity id="done-vr-button" visible="false" position="0 1.6 -1.5">
+        <a-plane class="done-vr-clickable" width="0.6" height="0.25" color="#222" material="opacity: 0.95" done-vr-button></a-plane>
+        <a-text value="DONE" position="0 0 0.02" align="center" color="#ffffff" width="3" wrap-count="20"></a-text>
+      </a-entity>
     </a-scene>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script>
+      (function () {
+        var lastError = '';
+        var lastErrorTime = 0;
+        function isActionableError(msg, src) {
+          if (!msg || typeof msg !== 'string') return false;
+          if (msg.indexOf('Script error') === 0 && !src) return false;
+          if (msg.indexOf('ResizeObserver') !== -1) return false;
+          return true;
+        }
+        function showErrorBanner(msg) {
+          if (!document.body) return;
+          var banner = document.getElementById('aframe-error-banner');
+          if (!banner) {
+            banner = document.createElement('div');
+            banner.id = 'aframe-error-banner';
+            banner.style.cssText = 'position:fixed;top:0;left:0;right:0;max-height:60px;overflow:auto;background:#b00;color:#fff;font-size:12px;padding:6px 10px;z-index:999999;pointer-events:none;';
+            document.body.appendChild(banner);
+          }
+          banner.textContent = msg;
+          banner.style.display = 'block';
+        }
+        window.onerror = function (msg, src, line, col, err) {
+          lastError = (msg || 'Error') + (src ? ' ' + src + ':' + line : '');
+          lastErrorTime = Date.now();
+          console.error(lastError, err || '');
+          if (typeof DEBUG_XR !== 'undefined' && DEBUG_XR) showErrorBanner(lastError);
+          else if (isActionableError(msg, src)) showErrorBanner(lastError);
+          return false;
+        };
+        window.onunhandledrejection = function (e) {
+          var msg = (e.reason && (e.reason.message || String(e.reason))) || 'Unhandled rejection';
+          lastError = msg;
+          lastErrorTime = Date.now();
+          console.error(msg);
+          if (typeof DEBUG_XR !== 'undefined' && DEBUG_XR) showErrorBanner(msg);
+          else if (isActionableError(msg, null)) showErrorBanner(msg);
+        };
+        if (typeof DEBUG_XR !== 'undefined' && DEBUG_XR) {
+          var overlay = document.createElement('div');
+          overlay.id = 'debug-xr-overlay';
+          overlay.style.cssText = 'position:fixed;top:8px;right:8px;padding:8px;background:rgba(0,0,0,0.7);color:#0f0;font:12px monospace;z-index:999998;pointer-events:none;max-width:280px;';
+          document.body.appendChild(overlay);
+          var fps = 0;
+          var then = performance.now();
+          function tick() {
+            requestAnimationFrame(tick);
+            var now = performance.now();
+            fps = Math.round(1000 / (now - then));
+            then = now;
+            overlay.innerHTML = 'FPS: ' + fps + '<br>Last error: ' + (lastError || '-') + ' (' + (Math.round((Date.now() - lastErrorTime) / 1000) || 0) + 's ago)';
+          }
+          requestAnimationFrame(tick);
+        }
+      })();
+    </script>
   </body>
   </html>
 

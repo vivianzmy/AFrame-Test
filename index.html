@@ -244,6 +244,136 @@
         }, 1000);
       }
 
+      // ============================================
+      // IDLE NUDGE POPUP SYSTEM
+      // ============================================
+      const NUDGE_MESSAGES = [
+        '82% of candidates adjusted their appearance before answering questions.',
+        '91% of participants selected at least one facial modification.',
+        'Top performers averaged 5 enhancements before starting the interview.',
+        'Recruiter tip: appearance and presentation matter most.',
+        'You are currently below the average preparation level',
+        'Recruiter tip: candidates who adjusted their appearance were perceived as more confident',
+        'You may be underprepared compared to the current pool',
+        'Recruiter tip: visual confidence affects perceived competence',
+        'Top performers averaged 5 enhancements before starting'
+      ];
+      let lastNudgeIndex = -1;
+      let firstPickTimerId = null;
+      let nudgeAppearanceCount = 0;
+      let nudgeSkillCount = 0;
+      let appearanceChosen = false;
+      let lastNudgeTime = 0;
+      // Minimum time between any two nudge popups (ms)
+      const NUDGE_DEBOUNCE_MS = 7000;
+      let nudgeLoopStarted = false;
+      let lastPickWasSkill = false;
+      let skillStreak = 0;
+
+      // Appearance / physical / facial items (treated as appearance)
+      const APPEARANCE_ITEMS = new Set([
+        'Height Extension',
+        'Shoulder Width',
+        'Breast Adjustments',
+        'Waist Sculpting',
+        'Ab Etching',
+        'Arm Slimming',
+        'Butt Implants',
+        'Eye Color',
+        'Eyelid Alteration',
+        'Brow Lift',
+        'Nose Job',
+        'Lip Shape',
+        'Cheekbone Alteration',
+        'Smile Brightening',
+        'Skin Texture Smoothing',
+        'Jawline Altercation',
+        'Face Lift'
+      ]);
+
+      function nextNudgeMessage() {
+        if (NUDGE_MESSAGES.length === 0) return '';
+        if (NUDGE_MESSAGES.length === 1) return NUDGE_MESSAGES[0];
+        let idx;
+        do {
+          idx = Math.floor(Math.random() * NUDGE_MESSAGES.length);
+        } while (idx === lastNudgeIndex);
+        lastNudgeIndex = idx;
+        return NUDGE_MESSAGES[idx];
+      }
+
+      function showNudge(message) {
+        const nudge = document.getElementById('nudge-popup');
+        if (!nudge) return;
+        const textEl = document.getElementById('nudge-text');
+        if (textEl) {
+          textEl.textContent = message;
+        } else {
+          nudge.textContent = message;
+        }
+        nudge.classList.add('show');
+        lastNudgeTime = Date.now();
+      }
+
+      function handleNudgeAfterPurchase(itemName) {
+        // Stop the initial idle nudge timer once any purchase happens
+        if (firstPickTimerId !== null) {
+          clearTimeout(firstPickTimerId);
+          firstPickTimerId = null;
+        }
+
+        if (APPEARANCE_ITEMS.has(itemName)) {
+          appearanceChosen = true;
+          nudgeAppearanceCount += 1;
+          // Once an appearance item is chosen, disable future skill-only nudges
+          lastPickWasSkill = false;
+          skillStreak = 0;
+          return;
+        }
+
+        // Treat everything else as a skill enhancement
+        nudgeSkillCount += 1;
+
+        // Track consecutive skill picks
+        if (lastPickWasSkill) {
+          skillStreak += 1;
+        } else {
+          skillStreak = 1;
+        }
+        lastPickWasSkill = true;
+
+        // Skill-only condition: at least one skill, zero appearance, and no appearance chosen yet
+        if (appearanceChosen) return;
+
+        // If two skills in a row and still in skill-only regime, nudge (respecting global debounce)
+        if (skillStreak >= 2 && nudgeAppearanceCount === 0) {
+          const now = Date.now();
+          if (now - lastNudgeTime < NUDGE_DEBOUNCE_MS) return;
+          showNudge(nextNudgeMessage());
+        }
+      }
+
+      function schedulePeriodicNudge() {
+        const delay = 5000; // every 5 seconds between checks
+        setTimeout(() => {
+          // Conditions for periodic nudges:
+          // - No picks yet (cart empty), OR
+          // - Skill-only pattern (only skill enhancements so far, no appearance chosen)
+          const noPicks = cartItems.length === 0;
+          const skillOnly =
+            !appearanceChosen &&
+            nudgeSkillCount > 0 &&
+            nudgeAppearanceCount === 0;
+          if (noPicks || skillOnly) {
+            const now = Date.now();
+            if (now - lastNudgeTime >= NUDGE_DEBOUNCE_MS) {
+              showNudge(nextNudgeMessage());
+            }
+          }
+          schedulePeriodicNudge();
+        }, delay);
+      }
+
       // Show insufficient balance popup
       function showInsufficientBalance() {
         const popup = document.getElementById('insufficient-popup');
@@ -589,6 +719,7 @@
               purchasedItems.add(itemName);
               showToast(itemName);
               addToCart(itemName);
+              handleNudgeAfterPurchase(itemName);
               if (typeof DEBUG_CLICK !== 'undefined' && DEBUG_CLICK) console.log('Purchased:', itemName, 'Remaining:', money);
             } else {
               if (typeof DEBUG_CLICK !== 'undefined' && DEBUG_CLICK) console.log('Insufficient funds:', cost, money);
@@ -864,6 +995,8 @@
         const infoForm = document.getElementById('info-form');
 
         const scene = document.querySelector('a-scene');
+        const nudgePopup = document.getElementById('nudge-popup');
+        const nudgeClose = document.getElementById('nudge-close');
         const userSummaryTop = document.getElementById('user-summary-top');
         const toastHud = document.getElementById('toast-hud');
         const hud = document.getElementById('hud');
@@ -895,9 +1028,28 @@
             scene.resize();
           }
           window.dispatchEvent(new Event('resize'));
+
+          // Start idle / skill-only nudge timers once the user enters the scene
+          if (!nudgeLoopStarted) {
+            nudgeLoopStarted = true;
+            // First idle nudge: 7s after entering the scene if no picks yet
+            firstPickTimerId = setTimeout(() => {
+              if (cartItems.length === 0) {
+                showNudge(nextNudgeMessage());
+              }
+            }, 7000);
+            // Ongoing nudges checked every 5s (skill-only)
+            schedulePeriodicNudge();
+          }
         };
 
         hideApp();
+
+        if (nudgeClose && nudgePopup) {
+          nudgeClose.addEventListener('click', () => {
+            nudgePopup.classList.remove('show');
+          });
+        }
 
         const generateUserId = () => {
           const part1 = Math.floor(100 + Math.random() * 900);
@@ -1146,6 +1298,44 @@
       }
       #toast-hud.show {
         opacity: 1;
+      }
+      #nudge-popup {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%) translateY(10px);
+        background: rgba(0, 0, 0, 0.8);
+        color: #ffffff;
+        padding: 10px 18px;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, 0.35);
+        font-size: 12px;
+        font-family: "MiSans Light", MiSans, sans-serif;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        opacity: 0;
+        pointer-events: none;
+        z-index: 11500;
+        transition: opacity 0.2s ease-out, transform 0.2s ease-out;
+        text-align: center;
+        max-width: 80vw;
+      }
+      #nudge-popup.show {
+        opacity: 1;
+        transform: translate(-50%, -50%) translateY(0);
+      }
+      #nudge-popup button {
+        border: none;
+        background: transparent;
+        color: #ffffff;
+        font-size: 14px;
+        line-height: 1;
+        cursor: pointer;
+        padding: 0 4px;
+        pointer-events: auto;
       }
       #face-hover-tooltip {
         position: fixed;
@@ -1539,6 +1729,10 @@
     </div>
     <div id="user-summary-top"></div>
     <div id="toast-hud"></div>
+    <div id="nudge-popup">
+      <span id="nudge-text"></span>
+      <button id="nudge-close" type="button">×</button>
+    </div>
     <div id="face-hover-tooltip"></div>
     <div id="hud">$1000</div>
     <div id="cart-button">My Cart</div>

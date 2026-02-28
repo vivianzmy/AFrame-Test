@@ -866,6 +866,33 @@
       });
 
       // ============================================
+      // HIDE BODY BOX (remove box mesh around body.glb)
+      // ============================================
+      AFRAME.registerComponent('hide-body-box', {
+        init: function () {
+          this.onModelLoaded = this.onModelLoaded.bind(this);
+          this.el.addEventListener('model-loaded', this.onModelLoaded);
+        },
+        onModelLoaded: function () {
+          var mesh = this.el.getObject3D('mesh');
+          if (!mesh) return;
+          mesh.traverse(function (node) {
+            if (!node.isMesh) return;
+            var name = (node.name || '').toLowerCase();
+            if (name.indexOf('box') !== -1 || name.indexOf('cube') !== -1 || name.indexOf('bounding') !== -1) {
+              node.visible = false;
+            }
+            if (node.material && node.material.wireframe) {
+              node.material.wireframe = false;
+            }
+          });
+        },
+        remove: function () {
+          this.el.removeEventListener('model-loaded', this.onModelLoaded);
+        }
+      });
+
+      // ============================================
       // DONE VR BUTTON (in-world, shown only in VR)
       // ============================================
       AFRAME.registerComponent('done-vr-button', {
@@ -1044,6 +1071,9 @@
         };
 
         hideApp();
+        // Temporarily bypass onboarding so scene is visible immediately.
+        // When ready to restore onboarding, remove this showApp() call.
+        showApp();
 
         if (nudgeClose && nudgePopup) {
           nudgeClose.addEventListener('click', () => {
@@ -1845,15 +1875,6 @@
           position="-4.9 -1 4.9"
           rotation="0 90 0"
           scale="0.8 0.8 0.8">
-          <a-image 
-            src="/bodyparts.png"
-            position="0 0 0"
-            width="8"
-            height="5.18"
-            material="transparent: true; alphaTest: 0.1; shader: flat; side: double"
-            fix-png-transparency>
-          </a-image>
-          
           <!-- Clickable colliders for bodyparts (7 total) -->
           <!-- Top row -->
           <a-plane 
@@ -1942,6 +1963,27 @@
             position="-9.5 -3.9 10"
             rotation="0 0 0"
             scale="3.5 3.5 3.5">
+          </a-entity>
+          <a-entity
+            gltf-model="url(/Empty Stand.glb)"
+            force-model-color="color: #f2f2f2"
+            position="12.5 -3.9 3"
+            rotation="0 180 0"
+            scale="3.9 3.9 3.9">
+          </a-entity>
+          <a-entity
+            gltf-model="url(/Empty Stand.glb)"
+            force-model-color="color: #f2f2f2"
+            position="10 -3.9 3"
+            rotation="0 180 0"
+            scale="3.9 3.9 3.9">
+          </a-entity>
+          <a-entity
+            gltf-model="url(/body.glb)"
+            hide-body-box
+            position="0 0.5 14.08"
+            rotation="25 90 -90"
+            scale="2 2 2">
           </a-entity>
           <a-entity
             id="femaleFace"

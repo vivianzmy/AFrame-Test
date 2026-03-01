@@ -1311,10 +1311,10 @@
       #hud {
         position: fixed;
         top: 20px;
-        right: 20px;
+        left: 20px;
         color: #565656;
         font-size: 32px;
-        font-weight: bold;
+        font-weight: medium;
         font-family: "MiSans Bold", MiSans, sans-serif;
         pointer-events: none;
         z-index: 9999;
@@ -1397,11 +1397,11 @@
       }
       #cart-button {
         position: fixed;
-        left: 20px;
-        bottom: 20px;
+        top: 20px;
+        right: 20px;
         padding: 8px 14px;
-        font-size: 12px;
-        font-family: "MiSans Light", MiSans, sans-serif;
+        font-size: 14px;
+        font-family: "MiSans Medium", MiSans, sans-serif;
         background: #ffffff;
         color: #e06562;
         border: 1px solid #ccc;
@@ -1412,8 +1412,8 @@
       }
       #cart-panel {
         position: fixed;
-        left: 20px;
-        bottom: 60px;
+        top: 60px;
+        right: 20px;
         width: 240px;
         max-height: 220px;
         background: #e06562;
@@ -1424,7 +1424,7 @@
         font-size: 11px;
         color: #ffffff;
         z-index: 10000;
-        transform: translateY(110%);
+        transform: translateY(-110%);
         opacity: 0;
         pointer-events: none;
         transition: transform 0.25s ease-out, opacity 0.25s ease-out;
@@ -1485,9 +1485,9 @@
         position: fixed;
         right: 20px;
         bottom: 20px;
-        padding: 8px 18px;
-        font-size: 12px;
-        font-family: "MiSans Light", MiSans, sans-serif;
+        padding: 10px 20px;
+        font-size: 14px;
+        font-family: "MiSans Medium", MiSans, sans-serif;
         background: #3ba96b;
         color: #ffffff;
         border: none;
@@ -2401,10 +2401,10 @@
       <a-text 
         id="money-text"
         value="$1000"
-        position="2 2.5 -2.5"
+        position="10 2.5 -2.5"
         align="left"
         color="#565656"
-        scale="2 2 2"
+        scale="3 3 3"
         visible="false"        
         look-at="#camera">
       </a-text>

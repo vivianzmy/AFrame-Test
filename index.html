@@ -1079,9 +1079,6 @@
         };
 
         hideApp();
-        // Temporarily bypass onboarding so scene is visible immediately.
-        // When ready to restore onboarding, remove this showApp() call.
-        showApp();
 
         if (nudgeClose && nudgePopup) {
           nudgeClose.addEventListener('click', () => {
@@ -1322,11 +1319,11 @@
       #toast-hud {
         position: fixed;
         left: 50%;
-        bottom: 20px;
+        top: 80px;
         transform: translateX(-50%);
         color: #4dcc4d;
         font-size: 20px;
-        font-family: "MiSans Light", MiSans, sans-serif;
+        font-family: "MiSans Medium", MiSans, sans-serif;
         letter-spacing: 0.08em;
         text-transform: uppercase;
         opacity: 0;
@@ -2401,7 +2398,7 @@
       <a-text 
         id="money-text"
         value="$1000"
-        position="10 2.5 -2.5"
+        position="2 2.5 -2.5"
         align="left"
         color="#565656"
         scale="3 3 3"

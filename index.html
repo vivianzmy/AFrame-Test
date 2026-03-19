@@ -619,59 +619,112 @@
       // Export summary screen as PDF
       async function exportSummaryAsPDF() {
         const summaryScreen = document.getElementById('summary-screen');
+        const summaryDocument = document.getElementById('summary-document');
         const exportButton = document.getElementById('export-button');
-        if (!summaryScreen) return;
+        if (!summaryScreen || !summaryDocument) return;
+
+        // Target portrait resolution for print
+        const TARGET_WIDTH_PX = 2480;
+        const TARGET_HEIGHT_PX = 3508;
+        const TARGET_DPI = 300;
 
         const originalHeight = summaryScreen.style.height;
         const originalOverflow = summaryScreen.style.overflow;
         const originalScrollTop = summaryScreen.scrollTop;
         const originalExportDisplay = exportButton ? exportButton.style.display : '';
 
-        summaryScreen.style.height = `${summaryScreen.scrollHeight}px`;
-        summaryScreen.style.overflow = 'visible';
-        summaryScreen.scrollTop = 0;
-        if (exportButton) {
-          exportButton.style.display = 'none';
+        // Temporarily force A-Frame renderer into a fixed portrait size (print proportions).
+        // This doesn't change the DOM layout we capture below, but it fulfills the requested
+        // "fixed portrait canvas" behavior and keeps the export pipeline consistent.
+        const sceneEl = document.querySelector('a-scene');
+        const cameraEl = document.getElementById('camera');
+        const renderer = sceneEl && sceneEl.renderer ? sceneEl.renderer : null;
+
+        let originalRendererSize = null;
+        let originalPixelRatio = null;
+        let originalCameraPosition = null;
+
+        if (renderer && renderer.setSize) {
+          try {
+            originalRendererSize = renderer.getSize ? renderer.getSize(new THREE.Vector2()) : null;
+            originalPixelRatio = renderer.getPixelRatio ? renderer.getPixelRatio() : null;
+            renderer.setPixelRatio(1);
+            renderer.setSize(TARGET_WIDTH_PX, TARGET_HEIGHT_PX, false);
+            if (renderer.domElement && renderer.domElement.style) {
+              renderer.domElement.style.width = `${TARGET_WIDTH_PX}px`;
+              renderer.domElement.style.height = `${TARGET_HEIGHT_PX}px`;
+            }
+          } catch (e) {
+            // Non-fatal; DOM export below will still work.
+          }
         }
 
-        // Use html2canvas to capture the full summary page (with grid/background)
-        const canvas = await html2canvas(summaryScreen, {
-          scale: 2,
-          useCORS: true,
-          backgroundColor: '#dbe6dc'
-        });
-
-        summaryScreen.style.height = originalHeight;
-        summaryScreen.style.overflow = originalOverflow;
-        summaryScreen.scrollTop = originalScrollTop;
-        if (exportButton) {
-          exportButton.style.display = originalExportDisplay;
+        if (cameraEl) {
+          originalCameraPosition = cameraEl.getAttribute('position');
+          // Only adjust forward/backward (Z) while keeping centered.
+          cameraEl.setAttribute('position', '0 2.2 -2.0');
         }
+
+        let canvas = null;
+        try {
+          summaryScreen.style.height = `${summaryScreen.scrollHeight}px`;
+          summaryScreen.style.overflow = 'visible';
+          summaryScreen.scrollTop = 0;
+          if (exportButton) exportButton.style.display = 'none';
+
+          // Capture ONLY the bordered summary document (no extra margins/background).
+          const docCssWidth = Math.max(1, summaryDocument.offsetWidth || 1);
+          const scale = Math.max(4, Math.min(10, TARGET_WIDTH_PX / docCssWidth));
+
+          // Small delay to let the browser paint the adjusted fixed-height state.
+          await new Promise((r) => setTimeout(r, 50));
+
+          canvas = await html2canvas(summaryDocument, {
+            scale,
+            useCORS: true,
+            backgroundColor: '#aacdc7',
+          });
+        } finally {
+          // Restore UI state immediately after capture.
+          summaryScreen.style.height = originalHeight;
+          summaryScreen.style.overflow = originalOverflow;
+          summaryScreen.scrollTop = originalScrollTop;
+          if (exportButton) exportButton.style.display = originalExportDisplay;
+
+          // Restore renderer + camera.
+          if (renderer && renderer.setSize && originalRendererSize) {
+            try {
+              renderer.setPixelRatio(originalPixelRatio || 1);
+              renderer.setSize(originalRendererSize.x, originalRendererSize.y, false);
+              if (renderer.domElement && renderer.domElement.style) {
+                renderer.domElement.style.width = '';
+                renderer.domElement.style.height = '';
+              }
+            } catch (e) {
+              // Non-fatal.
+            }
+          }
+          if (cameraEl && originalCameraPosition) {
+            cameraEl.setAttribute('position', originalCameraPosition);
+          }
+        }
+
+        if (!canvas) return;
+
         const imgData = canvas.toDataURL('image/png');
 
+        // Create a PDF whose page size matches the captured canvas exactly.
+        // This removes PDF-level centering/margins so the output bounds match the document bounds.
+        const pageWidthMm = (canvas.width / TARGET_DPI) * 25.4;
+        const pageHeightMm = (canvas.height / TARGET_DPI) * 25.4;
+
         const { jsPDF } = window.jspdf;
-        const pdf = new jsPDF('p', 'mm', 'a4');
-
-        const pageWidth = pdf.internal.pageSize.getWidth();
-        const pageHeight = pdf.internal.pageSize.getHeight();
-
-        const imgWidth = pageWidth;
-        const imgHeight = canvas.height * imgWidth / canvas.width;
-
-        let y = 0;
-        if (imgHeight > pageHeight) {
-          // If taller than a single page, scale to fit height instead
-          const ratio = pageHeight / imgHeight;
-          const scaledWidth = imgWidth * ratio;
-          const scaledHeight = imgHeight * ratio;
-          const x = (pageWidth - scaledWidth) / 2;
-          pdf.addImage(imgData, 'PNG', x, 0, scaledWidth, scaledHeight);
-        } else {
-          const x = 0;
-          y = (pageHeight - imgHeight) / 2;
-          pdf.addImage(imgData, 'PNG', x, y, imgWidth, imgHeight);
-        }
-
+        const pdf = new jsPDF({
+          orientation: 'p',
+          unit: 'mm',
+          format: [pageWidthMm, pageHeightMm]
+        });
+        pdf.addImage(imgData, 'PNG', 0, 0, pageWidthMm, pageHeightMm);
         pdf.save('purchase-summary.pdf');
       }
 
@@ -1522,7 +1575,9 @@
         z-index: 1;
         max-width: 820px;
         margin: 0 auto;
-        border: 1px solid rgba(0,0,0,0.6);
+        border: none;
+        /* Draw the document frame inside the element for reliable export capture. */
+        box-shadow: inset 0 0 0 1px rgba(0,0,0,0.6);
         padding: 22px 24px 26px 24px;
         box-sizing: border-box;
       }
@@ -1849,7 +1904,7 @@
       <!-- Camera with desktop mouse raycaster -->
       <a-camera
         id="camera"
-        position="0 2.2 -2.5"
+        position="0 2.2 -2.0"
         look-controls="enabled: true">
         <a-entity
           id="mouseCursor"

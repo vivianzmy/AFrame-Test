@@ -132,6 +132,117 @@
       });
 
       // ============================================
+      // VR PLAYER LOCOMOTION (Quest / WebXR thumbsticks)
+      // ============================================
+      // Attached to #playerRig (the entity that actually moves in the world).
+      // - Desktop: wasd-controls on the same rig handles keyboard movement (camera child supplies facing).
+      // - VR: WebXR overrides the camera's local pose for the headset; moving the camera entity fights
+      //   the runtime, so we translate/rotate this rig instead. Controllers are rig children, so rays stay aligned.
+      // Runs only while scene is in vr-mode; one update per tick; does not touch keyboard.
+      AFRAME.registerComponent('player-locomotion', {
+        schema: {
+          moveSpeed: { type: 'number', default: 3.5 },
+          turnSpeed: { type: 'number', default: 1.8 },
+          snapTurnAngle: { type: 'number', default: 30 },
+          snapTurn: { type: 'boolean', default: true },
+          snapCooldownMs: { type: 'number', default: 320 },
+          deadzone: { type: 'number', default: 0.22 }
+        },
+        init: function () {
+          this.forward = new THREE.Vector3();
+          this.right = new THREE.Vector3();
+          this.move = new THREE.Vector3();
+          this.snapTurnLocked = false;
+          this.onExitVr = this.onExitVr.bind(this);
+          this.el.sceneEl.addEventListener('exit-vr', this.onExitVr);
+        },
+        onExitVr: function () {
+          this.snapTurnLocked = false;
+        },
+        remove: function () {
+          this.el.sceneEl.removeEventListener('exit-vr', this.onExitVr);
+        },
+        getGamepadFromHandEl: function (handEl) {
+          if (!handEl || !handEl.components) return null;
+          var names = ['tracked-controls', 'tracked-controls-webxr', 'windows-motion-controls'];
+          for (var i = 0; i < names.length; i++) {
+            var c = handEl.components[names[i]];
+            if (c && c.controller && c.controller.gamepad) return c.controller.gamepad;
+          }
+          return null;
+        },
+        readThumbstick: function (gamepad) {
+          if (!gamepad || !gamepad.axes || gamepad.axes.length === 0) {
+            return { x: 0, y: 0 };
+          }
+          var a = gamepad.axes;
+          // Meta Quest Touch (WebXR): thumbstick is often axes[2]/[3]; fall back to [0]/[1].
+          if (a.length >= 4) {
+            return { x: a[2], y: a[3] };
+          }
+          return { x: a[0], y: a[1] };
+        },
+        tick: function (time, delta) {
+          var sceneEl = this.el.sceneEl;
+          if (!sceneEl.is('vr-mode')) return;
+
+          var dt = delta / 1000;
+          if (dt <= 0 || dt > 0.2) return;
+
+          var dz = this.data.deadzone;
+          var leftEl = document.querySelector('#vrControllerLeft');
+          var rightEl = document.querySelector('#vrControllerRight');
+          var camEl = sceneEl.camera && sceneEl.camera.el;
+          if (!camEl) return;
+
+          var gpL = this.getGamepadFromHandEl(leftEl);
+          var gpR = this.getGamepadFromHandEl(rightEl);
+          var stickL = this.readThumbstick(gpL);
+          var stickR = this.readThumbstick(gpR);
+
+          // --- Left thumbstick: move on XZ plane in the direction the headset is facing (ignore pitch) ---
+          var lx = Math.abs(stickL.x) > dz ? stickL.x : 0;
+          var ly = Math.abs(stickL.y) > dz ? stickL.y : 0;
+          if (lx !== 0 || ly !== 0) {
+            camEl.object3D.updateMatrixWorld(true);
+            camEl.object3D.getWorldDirection(this.forward);
+            this.forward.y = 0;
+            if (this.forward.lengthSq() < 1e-6) return;
+            this.forward.normalize();
+            // Right = forward × worldUp (matches typical FPS strafe; up×forward would invert left/right).
+            this.right.crossVectors(this.forward, new THREE.Vector3(0, 1, 0)).normalize();
+            // Stick up (negative Y on Quest) = walk forward.
+            this.move.copy(this.forward).multiplyScalar(-ly);
+            this.move.add(this.right.clone().multiplyScalar(lx));
+            this.move.y = 0;
+            var mag = Math.min(1, this.move.length());
+            if (mag > 0) {
+              this.move.normalize().multiplyScalar(this.data.moveSpeed * mag * dt);
+              this.el.object3D.position.add(this.move);
+            }
+          }
+
+          // --- Right thumbstick X: snap turn or smooth turn around rig Y (comfort rotation) ---
+          var rx = Math.abs(stickR.x) > dz ? stickR.x : 0;
+          if (rx === 0) return;
+
+          if (this.data.snapTurn) {
+            if (this.snapTurnLocked) return;
+            if (Math.abs(rx) < 0.65) return;
+            var step = THREE.MathUtils.degToRad(this.data.snapTurnAngle);
+            this.el.object3D.rotation.y += rx > 0 ? -step : step;
+            this.snapTurnLocked = true;
+            var self = this;
+            setTimeout(function () {
+              self.snapTurnLocked = false;
+            }, this.data.snapCooldownMs);
+          } else {
+            this.el.object3D.rotation.y -= rx * this.data.turnSpeed * dt;
+          }
+        }
+      });
+
+      // ============================================
       // DEBUG MODE (set true for click/raycaster logs)
       // ============================================
       const DEBUG_CLICK = false;
@@ -258,54 +369,75 @@
         'Recruiter tip: visual confidence affects perceived competence',
         'Top performers averaged 5 enhancements before starting'
       ];
-      let lastNudgeIndex = -1;
       let firstPickTimerId = null;
-      let nudgeAppearanceCount = 0;
-      let nudgeSkillCount = 0;
-      let appearanceChosen = false;
-      let lastNudgeTime = 0;
-      // Minimum time between any two nudge popups (ms)
-      const NUDGE_DEBOUNCE_MS = 7000;
-      let nudgeLoopStarted = false;
-      let lastPickWasSkill = false;
-      let skillStreak = 0;
+      let nudgeGapTimeoutId = null;
+      // 2–3 unique messages per scene visit, random subset each time
+      let nudgeVisitPlan = [];
+      let nudgeVisitNextIndex = 0;
 
-      // Appearance / physical / facial items (treated as appearance)
-      const APPEARANCE_ITEMS = new Set([
-        'Height Extension',
-        'Shoulder Width',
-        'Breast Adjustments',
-        'Waist Sculpting',
-        'Ab Etching',
-        'Arm Slimming',
-        'Muscle Sculpting',
-        'Butt Implants',
-        'Eye Color',
-        'Eyelid Alteration',
-        'Brow Lift',
-        'Nose Job',
-        'Lip Shape',
-        'Cheekbone Alteration',
-        'Smile Brightening',
-        'Skin Texture Smoothing',
-        'Jawline Altercation',
-        'Face Lift'
-      ]);
+      function shuffleNudgeMessagesCopy() {
+        const a = NUDGE_MESSAGES.slice();
+        for (let i = a.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          const t = a[i];
+          a[i] = a[j];
+          a[j] = t;
+        }
+        return a;
+      }
 
-      function nextNudgeMessage() {
-        if (NUDGE_MESSAGES.length === 0) return '';
-        if (NUDGE_MESSAGES.length === 1) return NUDGE_MESSAGES[0];
-        let idx;
-        do {
-          idx = Math.floor(Math.random() * NUDGE_MESSAGES.length);
-        } while (idx === lastNudgeIndex);
-        lastNudgeIndex = idx;
-        return NUDGE_MESSAGES[idx];
+      function buildNudgeVisitPlan() {
+        const count = 2 + Math.floor(Math.random() * 2); // 2 or 3
+        const shuffled = shuffleNudgeMessagesCopy();
+        const seen = new Set();
+        nudgeVisitPlan = [];
+        for (let i = 0; i < shuffled.length && nudgeVisitPlan.length < count; i++) {
+          const m = shuffled[i];
+          if (!seen.has(m)) {
+            seen.add(m);
+            nudgeVisitPlan.push(m);
+          }
+        }
+        nudgeVisitNextIndex = 0;
+      }
+
+      function clearNudgeVisitTimers() {
+        if (firstPickTimerId !== null) {
+          clearTimeout(firstPickTimerId);
+          firstPickTimerId = null;
+        }
+        if (nudgeGapTimeoutId !== null) {
+          clearTimeout(nudgeGapTimeoutId);
+          nudgeGapTimeoutId = null;
+        }
+      }
+
+      function showPlannedNudgeStep() {
+        if (nudgeVisitNextIndex >= nudgeVisitPlan.length) return;
+        const msg = nudgeVisitPlan[nudgeVisitNextIndex];
+        nudgeVisitNextIndex += 1;
+        showNudge(msg);
+      }
+
+      function scheduleNextPlannedNudgeAfterGap() {
+        if (nudgeVisitNextIndex >= nudgeVisitPlan.length) return;
+        if (nudgeGapTimeoutId !== null) {
+          clearTimeout(nudgeGapTimeoutId);
+          nudgeGapTimeoutId = null;
+        }
+        const gapMs = 12000 + Math.floor(Math.random() * 13000); // 12–25s between popups
+        nudgeGapTimeoutId = setTimeout(function () {
+          nudgeGapTimeoutId = null;
+          showPlannedNudgeStep();
+        }, gapMs);
       }
 
       function showNudge(message) {
         const nudge = document.getElementById('nudge-popup');
-        if (!nudge) return;
+        if (!nudge || !message) return;
+        if (nudge.classList.contains('show')) {
+          return;
+        }
         const textEl = document.getElementById('nudge-text');
         if (textEl) {
           textEl.textContent = message;
@@ -313,66 +445,22 @@
           nudge.textContent = message;
         }
         nudge.classList.add('show');
-        lastNudgeTime = Date.now();
       }
 
-      function handleNudgeAfterPurchase(itemName) {
-        // Stop the initial idle nudge timer once any purchase happens
+      function dismissNudgePopup() {
+        const nudge = document.getElementById('nudge-popup');
+        if (!nudge) return;
+        nudge.classList.remove('show');
+        if (nudgeVisitNextIndex < nudgeVisitPlan.length) {
+          scheduleNextPlannedNudgeAfterGap();
+        }
+      }
+
+      function handleNudgeAfterPurchase() {
         if (firstPickTimerId !== null) {
           clearTimeout(firstPickTimerId);
           firstPickTimerId = null;
         }
-
-        if (APPEARANCE_ITEMS.has(itemName)) {
-          appearanceChosen = true;
-          nudgeAppearanceCount += 1;
-          // Once an appearance item is chosen, disable future skill-only nudges
-          lastPickWasSkill = false;
-          skillStreak = 0;
-          return;
-        }
-
-        // Treat everything else as a skill enhancement
-        nudgeSkillCount += 1;
-
-        // Track consecutive skill picks
-        if (lastPickWasSkill) {
-          skillStreak += 1;
-        } else {
-          skillStreak = 1;
-        }
-        lastPickWasSkill = true;
-
-        // Skill-only condition: at least one skill, zero appearance, and no appearance chosen yet
-        if (appearanceChosen) return;
-
-        // If two skills in a row and still in skill-only regime, nudge (respecting global debounce)
-        if (skillStreak >= 2 && nudgeAppearanceCount === 0) {
-          const now = Date.now();
-          if (now - lastNudgeTime < NUDGE_DEBOUNCE_MS) return;
-          showNudge(nextNudgeMessage());
-        }
-      }
-
-      function schedulePeriodicNudge() {
-        const delay = 5000; // every 5 seconds between checks
-        setTimeout(() => {
-          // Conditions for periodic nudges:
-          // - No picks yet (cart empty), OR
-          // - Skill-only pattern (only skill enhancements so far, no appearance chosen)
-          const noPicks = cartItems.length === 0;
-          const skillOnly =
-            !appearanceChosen &&
-            nudgeSkillCount > 0 &&
-            nudgeAppearanceCount === 0;
-          if (noPicks || skillOnly) {
-            const now = Date.now();
-            if (now - lastNudgeTime >= NUDGE_DEBOUNCE_MS) {
-              showNudge(nextNudgeMessage());
-            }
-          }
-          schedulePeriodicNudge();
-        }, delay);
       }
 
       // Show insufficient balance popup
@@ -1054,14 +1142,86 @@
             });
           }
 
+          // ============================================
+          // VR menu hover labels (Quest / WebXR laser)
+          // ============================================
+          // Desktop uses mouseenter/mouseleave on each collider (menu-choice). Those DO NOT fire for
+          // controller raycasts. We mirror the same #face-hover-tooltip using raycaster-intersection
+          // on both hands. (Do not add face-hover-tooltip to VR overlay hide list — it must stay visible.)
+          var vrMenuHoverTargets = { left: null, right: null };
+
+          function findMenuChoiceHoverEntity(entity) {
+            var el = entity;
+            while (el) {
+              var mc = el.components && el.components['menu-choice'];
+              if (mc && mc.data && mc.data.showHoverLabel) return el;
+              el = el.parentEl || null;
+            }
+            return null;
+          }
+
+          function getRaycasterIntersectedEntity(evt) {
+            var d = evt.detail || {};
+            if (d.els && d.els.length > 0) return d.els[0];
+            var inters = d.intersections;
+            if (inters && inters.length > 0) {
+              var obj = inters[0].object;
+              while (obj && !obj.el) obj = obj.parent;
+              return obj ? obj.el : null;
+            }
+            return null;
+          }
+
+          function syncFaceHoverTooltipFromVrRaycasts() {
+            var tip = document.getElementById('face-hover-tooltip');
+            if (!tip) return;
+            if (!(scene.is && scene.is('vr-mode'))) return;
+            // Prefer right-hand aim, then left (typical Quest interaction)
+            var picked =
+              findMenuChoiceHoverEntity(vrMenuHoverTargets.right) ||
+              findMenuChoiceHoverEntity(vrMenuHoverTargets.left);
+            if (!picked) {
+              tip.classList.remove('show');
+              tip.classList.remove('hover-tooltip-right');
+              return;
+            }
+            var mc = picked.components['menu-choice'];
+            tip.textContent = mc.data.itemName;
+            tip.classList.remove('hover-tooltip-right');
+            if (mc.data.hoverTooltipSide === 'right') tip.classList.add('hover-tooltip-right');
+            tip.classList.add('show');
+          }
+
+          function wireVrMenuHoverRaycaster(cursorRoot, handKey) {
+            if (!cursorRoot) return;
+            cursorRoot.addEventListener('raycaster-intersection', function (evt) {
+              vrMenuHoverTargets[handKey] = getRaycasterIntersectedEntity(evt);
+              syncFaceHoverTooltipFromVrRaycasts();
+            });
+            cursorRoot.addEventListener('raycaster-intersection-cleared', function () {
+              vrMenuHoverTargets[handKey] = null;
+              syncFaceHoverTooltipFromVrRaycasts();
+            });
+          }
+
+          wireVrMenuHoverRaycaster(document.querySelector('#vrControllerLeft'), 'left');
+          wireVrMenuHoverRaycaster(document.querySelector('#vrControllerRight'), 'right');
+
           // VR enter/exit: hide DOM overlays in VR, show in-world DONE
           var doneVrEl = document.getElementById('done-vr-button');
-          var overlayIds = ['start-screen', 'info-screen', 'note-screen', 'user-summary-top', 'toast-hud', 'face-hover-tooltip', 'hud', 'cart-button', 'cart-panel', 'done-button', 'insufficient-popup'];
+          var overlayIds = ['start-screen', 'info-screen', 'note-screen', 'user-summary-top', 'toast-hud', 'hud', 'cart-button', 'cart-panel', 'done-button', 'insufficient-popup'];
           scene.addEventListener('enter-vr', function () {
             overlayIds.forEach(function (id) {
               var el = document.getElementById(id);
               if (el) el.style.display = 'none';
             });
+            vrMenuHoverTargets.left = null;
+            vrMenuHoverTargets.right = null;
+            var tipEnter = document.getElementById('face-hover-tooltip');
+            if (tipEnter) {
+              tipEnter.classList.remove('show');
+              tipEnter.classList.remove('hover-tooltip-right');
+            }
             if (doneVrEl) doneVrEl.setAttribute('visible', true);
           });
           scene.addEventListener('exit-vr', function () {
@@ -1070,6 +1230,13 @@
               if (el) el.style.display = '';
             });
             if (doneVrEl) doneVrEl.setAttribute('visible', false);
+            vrMenuHoverTargets.left = null;
+            vrMenuHoverTargets.right = null;
+            var tipEl = document.getElementById('face-hover-tooltip');
+            if (tipEl) {
+              tipEl.classList.remove('show');
+              tipEl.classList.remove('hover-tooltip-right');
+            }
           });
         });
       });
@@ -1117,25 +1284,22 @@
           }
           window.dispatchEvent(new Event('resize'));
 
-          // Start idle / skill-only nudge timers once the user enters the scene
-          if (!nudgeLoopStarted) {
-            nudgeLoopStarted = true;
-            // First idle nudge: 7s after entering the scene if no picks yet
-            firstPickTimerId = setTimeout(() => {
-              if (cartItems.length === 0) {
-                showNudge(nextNudgeMessage());
-              }
-            }, 7000);
-            // Ongoing nudges checked every 5s (skill-only)
-            schedulePeriodicNudge();
-          }
+          // Per visit: 2–3 random nudges, spaced apart; new random set each time you enter the scene
+          clearNudgeVisitTimers();
+          buildNudgeVisitPlan();
+          firstPickTimerId = setTimeout(function () {
+            firstPickTimerId = null;
+            if (cartItems.length === 0) {
+              showPlannedNudgeStep();
+            }
+          }, 7000);
         };
 
         hideApp();
 
         if (nudgeClose && nudgePopup) {
           nudgeClose.addEventListener('click', () => {
-            nudgePopup.classList.remove('show');
+            dismissNudgePopup();
           });
         }
 
@@ -1895,31 +2059,41 @@
         <a-asset-item id="sittingModel" src="/Sitting Idle (3).glb"></a-asset-item>
       </a-assets>
 
-      <!-- VR controller rays (Quest): same targets as desktop; click fires on intersected entity -->
+      <!--
+        Player rig: world position + yaw (VR snap/smooth turn). Camera + controllers are children so:
+        - Desktop WASD moves the rig while mouse-look rotates the camera (wasd uses camera facing).
+        - VR headset pose updates the camera locally; rig movement + rig.rotation.y = locomotion without fighting WebXR.
+      -->
       <a-entity
-        id="vrControllerLeft"
-        laser-controls="hand: left"
-        cursor="fuse: false"
-        raycaster="objects: .menu-item-clickable, .clickable-face, .done-vr-clickable; far: 50">
-      </a-entity>
-      <a-entity
-        id="vrControllerRight"
-        laser-controls="hand: right"
-        cursor="fuse: false"
-        raycaster="objects: .menu-item-clickable, .clickable-face, .done-vr-clickable; far: 50">
-      </a-entity>
-
-      <!-- Camera with desktop mouse raycaster -->
-      <a-camera
-        id="camera"
+        id="playerRig"
         position="0 2.2 -2.0"
-        look-controls="enabled: true">
+        player-locomotion="moveSpeed: 3.5; snapTurnAngle: 30; snapTurn: true"
+        wasd-controls="acceleration: 35; fly: false">
+        <!-- VR controller rays (Quest): same IDs/targets as before; click fires on intersected entity -->
         <a-entity
-          id="mouseCursor"
-          cursor="rayOrigin: mouse; fuse: false"
+          id="vrControllerLeft"
+          laser-controls="hand: left"
+          cursor="fuse: false"
           raycaster="objects: .menu-item-clickable, .clickable-face, .done-vr-clickable; far: 50">
         </a-entity>
-      </a-camera>
+        <a-entity
+          id="vrControllerRight"
+          laser-controls="hand: right"
+          cursor="fuse: false"
+          raycaster="objects: .menu-item-clickable, .clickable-face, .done-vr-clickable; far: 50">
+        </a-entity>
+        <!-- Camera at local origin: same world start as before (rig had the old camera position) -->
+        <a-camera
+          id="camera"
+          position="0 0 0"
+          look-controls="enabled: true">
+          <a-entity
+            id="mouseCursor"
+            cursor="rayOrigin: mouse; fuse: false"
+            raycaster="objects: .menu-item-clickable, .clickable-face, .done-vr-clickable; far: 50">
+          </a-entity>
+        </a-camera>
+      </a-entity>
       <a-entity gltf-model="url(/potted_plant_mediterranean_med_leaf_low_poly.glb)" position="-4 0 -8.5"  scale="2 2 2"></a-entity>
       <!-- Menu Image -->
       <a-entity id="menu-container" position="0 4 -8.8">
